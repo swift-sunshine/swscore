@@ -35,6 +35,10 @@ while [[ $# -gt 0 ]]; do
       KIALI_SRC_HOME="$2"
       shift;shift
       ;;
+    -kn|--kind-name)
+      KIND_NAME="$2"
+      shift;shift
+      ;;
     -mp|--minikube-profile)
       MINIKUBE_PROFILE="$2"
       shift;shift
@@ -82,6 +86,7 @@ $0 [option...] command
 -dorp|--docker-or-podman What should be used - "docker" or "podman"
 -hcr|--helm-charts-repo  Location of the helm charts git repo. (default: ../helm-charts)
 -ksh|--kiali_src-home    Location of the Kiali source code, the makefiles, and operator/molecule tests. (default: ..)
+-kn|--kind-name          If cluster type is 'kind' you can specify the cluster name that is in use via this option.
 -mp|--minikube-profile   If cluster type is 'minikube' you can specify the profile that is in use via this option.
 -nd|--never-destroy      Do not have the molecule framework destroy the test scaffolding. Setting this to true
                          will help test failures by allowing you to examine the operator logs after a test finished.
@@ -128,7 +133,7 @@ if [ ! -f "${HELM_CHARTS_REPO}/kiali-operator/Chart.yaml" ]; then echo "Kiali he
 
 # Set this to "minikube" if you want to test on minikube; "openshift" if testing on OpenShift.
 export CLUSTER_TYPE="${CLUSTER_TYPE:-openshift}"
-if [ "${CLUSTER_TYPE}" != "openshift" -a "${CLUSTER_TYPE}" != "minikube" ]; then echo "Cluster type is invalid: ${CLUSTER_TYPE}"; exit 1; fi
+if [ "${CLUSTER_TYPE}" != "openshift" -a "${CLUSTER_TYPE}" != "minikube" -a "${CLUSTER_TYPE}" != "kind" ]; then echo "Cluster type is invalid: ${CLUSTER_TYPE}"; exit 1; fi
 
 # A list of all the tests.
 # This list, minus the tests to be skipped (see SKIP_TESTS), are the tests that this script will run.
@@ -139,6 +144,8 @@ if [ "${CLUSTER_TYPE}" == "openshift" ]; then
   SKIP_TESTS="${SKIP_TESTS:-header-auth-test openid-test}"
 elif [ "${CLUSTER_TYPE}" == "minikube" ]; then
   SKIP_TESTS="${SKIP_TESTS:-os-console-links-test openshift-auth-test}"
+elif [ "${CLUSTER_TYPE}" == "kind" ]; then
+  SKIP_TESTS="${SKIP_TESTS:-header-auth-test openid-test os-console-links-test openshift-auth-test}"
 fi
 
 # If you want to test the latest release from quay, set this to "false".
@@ -183,6 +190,7 @@ echo TEST_LOGS_DIR="$TEST_LOGS_DIR"
 echo TEST_CLIENT_EXE="$TEST_CLIENT_EXE"
 echo COLOR="$COLOR"
 echo MINIKUBE_PROFILE="$MINIKUBE_PROFILE"
+echo KIND_NAME="$KIND_NAME"
 echo HELM_CHARTS_REPO="$HELM_CHARTS_REPO"
 echo "=============================="
 
@@ -232,7 +240,7 @@ prepare_test() {
 
     # if running the non-OpenShift openid-test or header-auth-test, create a rolebinding so the test can log in
     header-auth-test|openid-test)
-      if [ "${CLUSTER_TYPE}" == "minikube" ]; then
+      if [ "${CLUSTER_TYPE}" != "openshift" ]; then
         ${TEST_CLIENT_EXE:-kubectl} create rolebinding openid-rolebinding-istio-system --clusterrole=kiali --user=admin@example.com --namespace=istio-system >> ${TEST_LOGS_DIR}/${1}.log 2>&1
       fi
       ;;
@@ -253,7 +261,7 @@ unprepare_test() {
 
     # remove the rolebinding that was created
     header-auth-test|openid-test)
-      if [ "${CLUSTER_TYPE}" == "minikube" ]; then
+      if [ "${CLUSTER_TYPE}" != "openshift" ]; then
         ${TEST_CLIENT_EXE:-kubectl} delete rolebinding openid-rolebinding-istio-system --namespace=istio-system >> ${TEST_LOGS_DIR}/${1}.log 2>&1
       fi
       ;;
@@ -287,6 +295,9 @@ export DORP
 
 # the user may have specified a specific minikube profile to use - export this so make knows about it
 export MINIKUBE_PROFILE
+
+# the user may have specified a specific KinD cluster name to use - export this so make knows about it
+export KIND_NAME
 
 # build the latest Helm Chart
 echo
