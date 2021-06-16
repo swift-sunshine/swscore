@@ -33,11 +33,19 @@ const (
 	BoxByNamespace            string = "namespace"
 	BoxByNone                 string = "none"
 	NamespaceIstio            string = "istio-system"
+	RateNone                  string = "none"
+	RateReceived              string = "received" // tcp bytes received, grpc response messages, etc
+	RateRequests              string = "requests" // request count
+	RateSent                  string = "sent"     // tcp bytes sent, grpc request messages, etc
+	RateTotal                 string = "total"    // Sent+Received
 	defaultBoxBy              string = BoxByNone
 	defaultDuration           string = "10m"
 	defaultGraphType          string = GraphTypeWorkload
 	defaultIncludeIdleEdges   bool   = false
 	defaultInjectServiceNodes bool   = false
+	defaultRateHttp           string = RateRequests
+	defaultRateGrpc           string = RateRequests
+	defaultRateTcp            string = RateSent
 )
 
 const (
@@ -76,6 +84,12 @@ type RequestedAppenders struct {
 	AppenderNames []string
 }
 
+type RequestedRates struct {
+	Grpc string
+	Http string
+	Tcp  string
+}
+
 // TelemetryOptions are those supplied to Telemetry Vendors
 type TelemetryOptions struct {
 	AccessibleNamespaces map[string]time.Time
@@ -83,6 +97,7 @@ type TelemetryOptions struct {
 	IncludeIdleEdges     bool               // include edges with request rates of 0
 	InjectServiceNodes   bool               // inject destination service nodes between source and destination nodes.
 	Namespaces           NamespaceInfoMap
+	Rates                RequestedRates
 	CommonOptions
 	NodeOptions
 }
@@ -122,6 +137,9 @@ func NewOptions(r *net_http.Request) Options {
 	injectServiceNodesString := params.Get("injectServiceNodes")
 	namespaces := params.Get("namespaces") // csl of namespaces
 	queryTimeString := params.Get("queryTime")
+	rateGrpc := params.Get("rateGrpc")
+	rateHttp := params.Get("rateHttp")
+	rateTcp := params.Get("rateTcp")
 	telemetryVendor := params.Get("telemetryVendor")
 
 	if _, ok := params["appenders"]; ok {
@@ -232,7 +250,7 @@ func NewOptions(r *net_http.Request) Options {
 	}
 
 	if namespaces == "" {
-		BadRequest(fmt.Sprintf("At least one namespace must be specified via the namespaces query parameter."))
+		BadRequest("At least one namespace must be specified via the namespaces query parameter.")
 	}
 
 	for _, namespaceToken := range strings.Split(namespaces, ",") {
@@ -245,6 +263,57 @@ func NewOptions(r *net_http.Request) Options {
 			}
 		} else {
 			Forbidden(fmt.Sprintf("Requested namespace [%s] is not accessible.", namespaceToken))
+		}
+	}
+
+	// Process Rate Options
+
+	rates := RequestedRates{
+		Grpc: defaultRateGrpc,
+		Http: defaultRateHttp,
+		Tcp:  defaultRateTcp,
+	}
+
+	if rateGrpc != "" {
+		switch rateGrpc {
+		case RateNone:
+			rates.Grpc = RateNone
+		case RateReceived:
+			rates.Grpc = RateReceived
+		case RateRequests:
+			rates.Grpc = RateRequests
+		case RateSent:
+			rates.Grpc = RateSent
+		case RateTotal:
+			rates.Grpc = RateTotal
+		default:
+			BadRequest(fmt.Sprintf("Invalid gRPC Rate [%s]", rateHttp))
+		}
+	}
+
+	if rateHttp != "" {
+		switch rateHttp {
+		case RateNone:
+			rates.Http = RateNone
+		case RateRequests:
+			rates.Http = RateRequests
+		default:
+			BadRequest(fmt.Sprintf("Invalid HTTP Rate [%s]", rateHttp))
+		}
+	}
+
+	if rateTcp != "" {
+		switch rateTcp {
+		case RateNone:
+			rates.Tcp = RateNone
+		case RateReceived:
+			rates.Tcp = RateReceived
+		case RateSent:
+			rates.Tcp = RateSent
+		case RateTotal:
+			rates.Tcp = RateTotal
+		default:
+			BadRequest(fmt.Sprintf("Invalid TCP Rate [%s]", rateHttp))
 		}
 	}
 
@@ -271,6 +340,7 @@ func NewOptions(r *net_http.Request) Options {
 			IncludeIdleEdges:     includeIdleEdges,
 			InjectServiceNodes:   injectServiceNodes,
 			Namespaces:           namespaceMap,
+			Rates:                rates,
 			CommonOptions: CommonOptions{
 				Duration:  time.Duration(duration),
 				GraphType: graphType,
