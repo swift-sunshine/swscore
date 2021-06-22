@@ -19,6 +19,7 @@ import (
 	"context"
 	"crypto/md5"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -37,6 +38,10 @@ import (
 const (
 	tsHash    graph.MetadataKey = "tsHash"
 	tsHashMap graph.MetadataKey = "tsHashMap"
+)
+
+var (
+	grpcMetric = regexp.MustCompile(`istio_.*_messages`)
 )
 
 // BuildNamespacesTrafficMap is required by the graph/TelemtryVendor interface
@@ -121,9 +126,9 @@ func buildNamespaceTrafficMap(namespace string, o graph.TelemetryOptions, client
 	}
 
 	// GRPC Message traffic
-	if o.Rates.Grpc != graph.RateNone {
+	if o.Rates.Grpc != graph.RateNone && o.Rates.Grpc != graph.RateRequests {
 		var metrics []string
-		groupBy := "source_cluster,source_workload_namespace,source_workload,source_canonical_service,source_canonical_revision,destination_cluster,destination_service_namespace,destination_service,destination_service_name,destination_workload_namespace,destination_workload,destination_canonical_service,destination_canonical_revision,response_flags"
+		groupBy := "source_cluster,source_workload_namespace,source_workload,source_canonical_service,source_canonical_revision,destination_cluster,destination_service_namespace,destination_service,destination_service_name,destination_workload_namespace,destination_workload,destination_canonical_service,destination_canonical_revision"
 
 		switch o.Rates.Grpc {
 		case graph.RateReceived:
@@ -132,6 +137,8 @@ func buildNamespaceTrafficMap(namespace string, o graph.TelemetryOptions, client
 			metrics = []string{"istio_request_messages_total"}
 		case graph.RateTotal:
 			metrics = []string{"istio_request_messages_total", "istio_response_messages_total"}
+		default:
+			metrics = []string{}
 		}
 
 		for _, metric := range metrics {
@@ -180,6 +187,8 @@ func buildNamespaceTrafficMap(namespace string, o graph.TelemetryOptions, client
 			metrics = []string{"istio_tcp_sent_bytes_total"}
 		case graph.RateTotal:
 			metrics = []string{"istio_tcp_sent_bytes_total", "istio_tcp_received_bytes_total"}
+		default:
+			metrics = []string{}
 		}
 
 		for _, metric := range metrics {
@@ -223,15 +232,15 @@ func populateTrafficMap(trafficMap graph.TrafficMap, vector *model.Vector, metri
 	isRequests := true
 	protocol := ""
 	switch {
-	case strings.HasPrefix(metric, "istio_messages"):
+	case grpcMetric.MatchString(metric):
 		isRequests = false
 		protocol = graph.GRPC.Name
 	case strings.HasPrefix(metric, "istio_tcp"):
 		isRequests = false
 		protocol = graph.TCP.Name
 	}
-	skipGrpc := isRequests && o.Rates.Grpc == graph.RateNone
-	skipHttp := isRequests && o.Rates.Http == graph.RateNone
+	skipRequestsGrpc := isRequests && o.Rates.Grpc != graph.RateRequests
+	skipRequestsHttp := isRequests && o.Rates.Http != graph.RateRequests
 
 	for _, s := range *vector {
 		val := float64(s.Value)
@@ -251,8 +260,7 @@ func populateTrafficMap(trafficMap graph.TrafficMap, vector *model.Vector, metri
 		lDestApp, destAppOk := m["destination_canonical_service"]
 		lDestVer, destVerOk := m["destination_canonical_revision"]
 
-		lFlags, flagsOk := m["response_flags"]
-		if !sourceWlNsOk || !sourceWlOk || !sourceAppOk || !sourceVerOk || !destSvcNsOk || !destSvcOk || !destSvcNameOk || !destWlNsOk || !destWlOk || !destAppOk || !destVerOk || !flagsOk {
+		if !sourceWlNsOk || !sourceWlOk || !sourceAppOk || !sourceVerOk || !destSvcNsOk || !destSvcOk || !destSvcNameOk || !destWlNsOk || !destWlOk || !destAppOk || !destVerOk {
 			log.Warningf("Skipping %s, missing expected TS labels", m.String())
 			continue
 		}
@@ -262,7 +270,16 @@ func populateTrafficMap(trafficMap graph.TrafficMap, vector *model.Vector, metri
 		sourceApp := string(lSourceApp)
 		sourceVer := string(lSourceVer)
 		destSvc := string(lDestSvc)
-		flags := string(lFlags)
+
+		flags := ""
+		if isRequests || protocol == graph.TCP.Name {
+			lFlags, flagsOk := m["response_flags"]
+			if !flagsOk {
+				log.Warningf("Skipping %s, missing expected TS labels", m.String())
+				continue
+			}
+			flags = string(lFlags)
+		}
 
 		// handle clusters
 		sourceCluster, destCluster := util.HandleClusters(lSourceCluster, sourceClusterOk, lDestCluster, destClusterOk)
@@ -290,7 +307,7 @@ func populateTrafficMap(trafficMap graph.TrafficMap, vector *model.Vector, metri
 			}
 
 			protocol = string(lProtocol)
-			if skipGrpc && protocol == graph.GRPC.Name || skipHttp && protocol == graph.HTTP.Name {
+			if skipRequestsGrpc && protocol == graph.GRPC.Name || skipRequestsHttp && protocol == graph.HTTP.Name {
 				continue
 			}
 

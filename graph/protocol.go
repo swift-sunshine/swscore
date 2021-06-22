@@ -232,7 +232,7 @@ func IsHTTPErr(code string) bool {
 
 // IsGRPCErr return true if code != 0
 func IsGRPCErr(code string) bool {
-	return code != "0"
+	return code != "0" && code != ""
 }
 
 // AddOutgoingEdgeToMetadata updates the source node's outgoing traffic with the outgoing edge traffic value
@@ -375,6 +375,11 @@ func addToMetadataResponses(md Metadata, k MetadataKey, code, flags, host string
 	var responses Responses
 	var responseDetail *ResponseDetail
 	var ok bool
+
+	if code == "" {
+		code = "-"
+	}
+
 	responses, ok = md[k].(Responses)
 	if !ok {
 		responses = Responses{}

@@ -287,7 +287,7 @@ func NewOptions(r *net_http.Request) Options {
 		case RateTotal:
 			rates.Grpc = RateTotal
 		default:
-			BadRequest(fmt.Sprintf("Invalid gRPC Rate [%s]", rateHttp))
+			BadRequest(fmt.Sprintf("Invalid gRPC Rate [%s]", rateGrpc))
 		}
 	}
 
@@ -313,7 +313,7 @@ func NewOptions(r *net_http.Request) Options {
 		case RateTotal:
 			rates.Tcp = RateTotal
 		default:
-			BadRequest(fmt.Sprintf("Invalid TCP Rate [%s]", rateHttp))
+			BadRequest(fmt.Sprintf("Invalid TCP Rate [%s]", rateTcp))
 		}
 	}
 
