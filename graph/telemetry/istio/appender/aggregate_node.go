@@ -71,7 +71,7 @@ func (a AggregateNodeAppender) appendGraph(trafficMap graph.TrafficMap, namespac
 		int(duration.Seconds()), // range duration for the query
 		groupBy)
 	/* It's not clear that request classification makes sense for TCP metrics. Because it costs us queries I'm
-	   removing the support for now, we can add it back if someone presents a valid use case.
+	   removing the support for now, we can add it back if someone presents a valid use case. (same for gRPC messages)
 	tcpQuery := fmt.Sprintf(`sum(rate(%s{reporter="destination",source_workload_namespace!="%s",destination_service_namespace="%v",%s!="unknown"}[%vs])) by (%s) > 0`,
 		"istio_tcp_sent_bytes_total",
 		namespace,
