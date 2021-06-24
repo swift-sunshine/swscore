@@ -119,6 +119,9 @@ func (a AggregateNodeAppender) appendNodeGraph(trafficMap graph.TrafficMap, name
 }
 
 func (a AggregateNodeAppender) injectAggregates(trafficMap graph.TrafficMap, vector *model.Vector) {
+	skipRequestsGrpc := a.Rates.Grpc != graph.RateRequests
+	skipRequestsHttp := a.Rates.Http != graph.RateRequests
+
 	for _, s := range *vector {
 		m := s.Metric
 		lSourceCluster, sourceClusterOk := m["source_cluster"]
@@ -134,17 +137,17 @@ func (a AggregateNodeAppender) injectAggregates(trafficMap graph.TrafficMap, vec
 		lDestWl, destWlOk := m["destination_workload"]
 		lDestApp, destAppOk := m["destination_canonical_service"]
 		lDestVer, destVerOk := m["destination_canonical_revision"]
-		lCode := m["response_code"]                // will be missing for TCP
+		lCode := m["response_code"]
 		lGrpc, grpcOk := m["grpc_response_status"] // will be missing for non-GRPC
 		lFlags, flagsOk := m["response_flags"]
-		lProtocol, protocolOk := m["request_protocol"]
+		lProtocol, protocolOk := m["request_protocol"]             // because currently we only support requests traffic the protocol should be set
 		lAggregate, aggregateOk := m[model.LabelName(a.Aggregate)] // may be unset, see note above
 
 		if !aggregateOk {
 			continue
 		}
 
-		if !sourceWlNsOk || !sourceWlOk || !sourceAppOk || !sourceVerOk || !destSvcNsOk || !destSvcOk || !destSvcNameOk || !destWlNsOk || !destWlOk || !destAppOk || !destVerOk || !flagsOk {
+		if !sourceWlNsOk || !sourceWlOk || !sourceAppOk || !sourceVerOk || !destSvcNsOk || !destSvcOk || !destSvcNameOk || !destWlNsOk || !destWlOk || !destAppOk || !destVerOk || !flagsOk || !protocolOk {
 			log.Warningf("Skipping %v, missing expected labels", m.String())
 			continue
 		}
@@ -159,6 +162,10 @@ func (a AggregateNodeAppender) injectAggregates(trafficMap graph.TrafficMap, vec
 		flags := string(lFlags)
 		aggregate := string(lAggregate)
 
+		if (skipRequestsHttp && protocol == graph.HTTP.Name) || (skipRequestsGrpc && protocol == graph.GRPC.Name) {
+			continue
+		}
+
 		// handle clusters
 		sourceCluster, destCluster := util.HandleClusters(lSourceCluster, sourceClusterOk, lDestCluster, destClusterOk)
 
@@ -170,7 +177,7 @@ func (a AggregateNodeAppender) injectAggregates(trafficMap graph.TrafficMap, vec
 			// set response code in a backward compatible way
 			code = util.HandleResponseCode(protocol, code, grpcOk, string(lGrpc))
 		} else {
-			// because we are not currently supporting TCP requests, the protocol should be set
+			// because currently we only support requests traffic the protocol should be set
 			log.Warningf("Skipping %v, missing expected protocol label", m.String())
 			continue
 			// protocol = "tcp"
