@@ -637,6 +637,30 @@
           },
           {
             "type": "string",
+            "default": "requests",
+            "x-go-name": "Name",
+            "description": "How to calculate gRPC traffic rate. One of: none | received (i.e. response_messages) | requests | sent (i.e. request_messages) | total (i.e. sent+received).",
+            "name": "rateGrpc",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "default": "requests",
+            "x-go-name": "Name",
+            "description": "How to calculate HTTP traffic rate. One of: none | requests.",
+            "name": "rateHttp",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "default": "sent",
+            "x-go-name": "Name",
+            "description": "How to calculate TCP traffic rate. One of: none | received (i.e. received_bytes) | sent (i.e. sent_bytes) | total (i.e. sent+received).",
+            "name": "rateTcp",
+            "in": "query"
+          },
+          {
+            "type": "string",
             "default": "95",
             "x-go-name": "Name",
             "description": "Used only with responseTime appender. One of: avg | 50 | 95 | 99.",
@@ -1091,6 +1115,30 @@
           },
           {
             "type": "string",
+            "default": "requests",
+            "x-go-name": "Name",
+            "description": "How to calculate gRPC traffic rate. One of: none | received (i.e. response_messages) | requests | sent (i.e. request_messages) | total (i.e. sent+received).",
+            "name": "rateGrpc",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "default": "requests",
+            "x-go-name": "Name",
+            "description": "How to calculate HTTP traffic rate. One of: none | requests.",
+            "name": "rateHttp",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "default": "sent",
+            "x-go-name": "Name",
+            "description": "How to calculate TCP traffic rate. One of: none | received (i.e. received_bytes) | sent (i.e. sent_bytes) | total (i.e. sent+received).",
+            "name": "rateTcp",
+            "in": "query"
+          },
+          {
+            "type": "string",
             "default": "95",
             "x-go-name": "Name",
             "description": "Used only with responseTime appender. One of: avg | 50 | 95 | 99.",
@@ -1219,6 +1267,30 @@
             "x-go-name": "Name",
             "description": "Unix time (seconds) for query such that time range is [queryTime-duration..queryTime]. Default is now.",
             "name": "queryTime",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "default": "requests",
+            "x-go-name": "Name",
+            "description": "How to calculate gRPC traffic rate. One of: none | received (i.e. response_messages) | requests | sent (i.e. request_messages) | total (i.e. sent+received).",
+            "name": "rateGrpc",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "default": "requests",
+            "x-go-name": "Name",
+            "description": "How to calculate HTTP traffic rate. One of: none | requests.",
+            "name": "rateHttp",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "default": "sent",
+            "x-go-name": "Name",
+            "description": "How to calculate TCP traffic rate. One of: none | received (i.e. received_bytes) | sent (i.e. sent_bytes) | total (i.e. sent+received).",
+            "name": "rateTcp",
             "in": "query"
           },
           {
@@ -2824,6 +2896,30 @@
           },
           {
             "type": "string",
+            "default": "requests",
+            "x-go-name": "Name",
+            "description": "How to calculate gRPC traffic rate. One of: none | received (i.e. response_messages) | requests | sent (i.e. request_messages) | total (i.e. sent+received).",
+            "name": "rateGrpc",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "default": "requests",
+            "x-go-name": "Name",
+            "description": "How to calculate HTTP traffic rate. One of: none | requests.",
+            "name": "rateHttp",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "default": "sent",
+            "x-go-name": "Name",
+            "description": "How to calculate TCP traffic rate. One of: none | received (i.e. received_bytes) | sent (i.e. sent_bytes) | total (i.e. sent+received).",
+            "name": "rateTcp",
+            "in": "query"
+          },
+          {
+            "type": "string",
             "default": "95",
             "x-go-name": "Name",
             "description": "Used only with responseTime appender. One of: avg | 50 | 95 | 99.",
@@ -3577,6 +3673,30 @@
             "x-go-name": "Name",
             "description": "Unix time (seconds) for query such that time range is [queryTime-duration..queryTime]. Default is now.",
             "name": "queryTime",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "default": "requests",
+            "x-go-name": "Name",
+            "description": "How to calculate gRPC traffic rate. One of: none | received (i.e. response_messages) | requests | sent (i.e. request_messages) | total (i.e. sent+received).",
+            "name": "rateGrpc",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "default": "requests",
+            "x-go-name": "Name",
+            "description": "How to calculate HTTP traffic rate. One of: none | requests.",
+            "name": "rateHttp",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "default": "sent",
+            "x-go-name": "Name",
+            "description": "How to calculate TCP traffic rate. One of: none | received (i.e. received_bytes) | sent (i.e. sent_bytes) | total (i.e. sent+received).",
+            "name": "rateTcp",
             "in": "query"
           },
           {
