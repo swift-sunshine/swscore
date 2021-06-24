@@ -120,6 +120,7 @@ func ParseAppenders(o graph.TelemetryOptions) []graph.Appender {
 			InjectServiceNodes: o.InjectServiceNodes,
 			Namespaces:         o.Namespaces,
 			QueryTime:          o.QueryTime,
+			Rates:              o.Rates,
 			ThroughputType:     throughputType,
 		}
 		appenders = append(appenders, a)
