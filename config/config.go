@@ -316,10 +316,21 @@ type GraphFindOption struct {
 	Expression  string `yaml:"expression,omitempty" json:"expression,omitempty"`
 }
 
+// GraphTraffic defines the protocol-specific rates used to determine traffic for graph generation.
+// grpc options : none | sent (messages) | received (messages) | requests (default) | total (messages)
+// http options : none | requests (default)
+// tcp options  : none | sent (bytes, default) | received (bytes) | total (bytes)
+type GraphTraffic struct {
+	Grpc string `yaml:"grpc,omitempty" json:"grpc,omitempty"`
+	Http string `yaml:"http,omitempty" json:"http,omitempty"`
+	Tcp  string `yaml:"tcp,omitempty" json:"tcp,omitempty"`
+}
+
 // GraphUIDefaults defines UI Defaults specific to the UI Graph
 type GraphUIDefaults struct {
 	FindOptions []GraphFindOption `yaml:"find_options,omitempty" json:"findOptions,omitempty"`
 	HideOptions []GraphFindOption `yaml:"hide_options,omitempty" json:"hideOptions,omitempty"`
+	Traffic     GraphTraffic      `yaml:"traffic,omitempty" json:"traffic,omitempty"`
 }
 
 // UIDefaults defines default settings configured for the UI
@@ -528,6 +539,11 @@ func NewConfig() (c *Config) {
 							Description: "Hide: unknown nodes",
 							Expression:  "name = unknown",
 						},
+					},
+					Traffic: GraphTraffic{
+						Grpc: "requests",
+						Http: "requests",
+						Tcp:  "sent",
 					},
 				},
 				MetricsPerRefresh: "1m",
