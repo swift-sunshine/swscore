@@ -43,8 +43,8 @@ const (
 	defaultGraphType          string = GraphTypeWorkload
 	defaultIncludeIdleEdges   bool   = false
 	defaultInjectServiceNodes bool   = false
-	defaultRateHttp           string = RateRequests
 	defaultRateGrpc           string = RateRequests
+	defaultRateHttp           string = RateRequests
 	defaultRateTcp            string = RateSent
 )
 
