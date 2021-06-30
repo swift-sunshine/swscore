@@ -684,7 +684,7 @@ func mockDeploymentCall(deployments []apps_v1.Deployment, daemonSets []apps_v1.D
 	if !isIstioReachable {
 		err = fmt.Errorf("the Istio pods are unreachable")
 	}
-	k8s.On("GetPodProxy", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return([]byte{}, err)
+	k8s.On("GetPodPortForwarder", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("string")).Return([]byte{}, err)
 
 	return k8s
 }

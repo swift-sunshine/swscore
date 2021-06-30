@@ -23,6 +23,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd/api"
 
+	"github.com/kiali/kiali/log"
 	"github.com/kiali/kiali/util/httputil"
 )
 
@@ -42,8 +43,8 @@ type K8SClientInterface interface {
 	GetNamespaces(labelSelector string) ([]core_v1.Namespace, error)
 	GetPod(namespace, name string) (*core_v1.Pod, error)
 	GetPodLogs(namespace, name string, opts *core_v1.PodLogOptions) (*PodLogs, error)
-	GetPodProxy(namespace, name, path string) ([]byte, error)
 	GetPods(namespace, labelSelector string) ([]core_v1.Pod, error)
+	GetPodPortForwarder(namespace, podName, portMap string) (*httputil.PortForwarder, error)
 	GetReplicationControllers(namespace string) ([]core_v1.ReplicationController, error)
 	GetReplicaSets(namespace string) ([]apps_v1.ReplicaSet, error)
 	GetSecrets(namespace string, labelSelector string) ([]core_v1.Secret, error)
@@ -326,6 +327,33 @@ func (in *K8SClient) GetPods(namespace, labelSelector string) ([]core_v1.Pod, er
 	}
 }
 
+// GetPodPortForwarder returns a port-forwarder struct which represents an open server forwarding request to the
+// requested pod and port
+// namespace: name of the namespace where the pod lives in.
+// name: name of the pod living in the namespace
+// portMap: ports open by the forwarder. Local port and destination port. Format: "80:8080" (local:destination)
+// It returns both a portforwarder and an error (if present)
+func (in *K8SClient) GetPodPortForwarder(namespace, name, portMap string) (*httputil.PortForwarder, error) {
+	writer := new(bytes.Buffer)
+
+	clientConfig, err := ConfigClient()
+	if err != nil {
+		log.Errorf("Error getting Kubernetes Client config: %v", err)
+		return nil, err
+	}
+
+	// First try whether the pod exist or not
+	_, err = in.GetPod(namespace, name)
+	if err != nil {
+		log.Errorf("Couldn't fetch the Pod: %v", err)
+		return nil, err
+	}
+
+	// Create a Port Forwarder
+	return httputil.NewPortForwarder(in.k8s.CoreV1().RESTClient(), clientConfig,
+		namespace, name, "localhost", portMap, writer)
+}
+
 // GetPod returns the pod definitions for a given pod name.
 // It returns an error on any problem.
 func (in *K8SClient) GetPod(namespace, name string) (*core_v1.Pod, error) {
@@ -354,17 +382,6 @@ func (in *K8SClient) GetPodLogs(namespace, name string, opts *core_v1.PodLogOpti
 	}
 
 	return &PodLogs{Logs: buf.String()}, nil
-}
-
-func (in *K8SClient) GetPodProxy(namespace, name, path string) ([]byte, error) {
-	return in.k8s.CoreV1().RESTClient().Get().
-		Timeout(httputil.DefaultTimeout).
-		Namespace(namespace).
-		Resource("pods").
-		SubResource("proxy").
-		Name(name).
-		Suffix(path).
-		DoRaw(in.ctx)
 }
 
 func (in *K8SClient) GetCronJobs(namespace string) ([]batch_v1beta1.CronJob, error) {
