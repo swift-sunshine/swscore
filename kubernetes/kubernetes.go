@@ -4,6 +4,7 @@ import (
 	"bytes"
 	goerrors "errors"
 	"fmt"
+	"time"
 
 	osapps_v1 "github.com/openshift/api/apps/v1"
 	osproject_v1 "github.com/openshift/api/project/v1"
@@ -28,6 +29,7 @@ import (
 )
 
 type K8SClientInterface interface {
+	ForwardGetRequest(namespace, podName string, localPort, destinationPort int, path string) ([]byte, error)
 	GetClusterServicesByLabels(labelsSelector string) ([]core_v1.Service, error)
 	GetConfigMap(namespace, name string) (*core_v1.ConfigMap, error)
 	GetCronJobs(namespace string) ([]batch_v1beta1.CronJob, error)
@@ -65,6 +67,30 @@ type OSClientInterface interface {
 	GetProjects(labelSelector string) ([]osproject_v1.Project, error)
 	GetRoute(namespace string, name string) (*osroutes_v1.Route, error)
 	UpdateProject(project string, jsonPatch string) (*osproject_v1.Project, error)
+}
+
+
+func (in *K8SClient) ForwardGetRequest(namespace, podName string, localPort, destinationPort int, path string) ([]byte, error) {
+	f, err := in.GetPodPortForwarder(namespace, podName, fmt.Sprintf("%d:%d", localPort, destinationPort))
+	if err != nil {
+		return nil, err
+	}
+
+	// Start the forwarding
+	if err := (*f).Start(); err != nil {
+		return nil, err
+	}
+
+	// Defering the finish of the port-forwarding
+	defer (*f).Stop()
+
+	// Ready to create a request
+	resp, code, err := httputil.HttpGet(fmt.Sprintf("http://localhost:%d%s", localPort, path), nil, 10*time.Second)
+	if code >= 400 {
+		return resp, fmt.Errorf("error fetching %s from %s/%s. Response code: %d", path, namespace, podName, code)
+	}
+
+	return resp, err
 }
 
 // GetClusterServicesByLabels fetches and returns all services in the whole cluster
@@ -350,7 +376,8 @@ func (in *K8SClient) GetPodPortForwarder(namespace, name, portMap string) (*http
 	}
 
 	// Create a Port Forwarder
-	return httputil.NewPortForwarder(in.k8s.CoreV1().RESTClient(), clientConfig,
+	restInterface := in.k8s.CoreV1().RESTClient()
+	return httputil.NewPortForwarder(&restInterface, clientConfig,
 		namespace, name, "localhost", portMap, writer)
 }
 

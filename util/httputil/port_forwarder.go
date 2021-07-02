@@ -1,17 +1,13 @@
 package httputil
 
 import (
-	"fmt"
 	"io"
-	"net/http"
-	"os"
-	"time"
-
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
+	"net/http"
+	"os"
 
-	"github.com/kiali/kiali/kubernetes"
 	"github.com/kiali/kiali/log"
 )
 
@@ -49,11 +45,11 @@ func (f forwarder) Stop() {
 	close(f.StopCh)
 }
 
-func NewPortForwarder(client rest.Interface, clientConfig *rest.Config, namespace, pod, address, portMap string, writer io.Writer) (*PortForwarder, error) {
+func NewPortForwarder(client *rest.Interface, clientConfig *rest.Config, namespace, pod, address, portMap string, writer io.Writer) (*PortForwarder, error) {
 	stopCh := make(chan struct{})
 	readyCh := make(chan struct{})
 
-	forwarderUrl := client.Post().
+	forwarderUrl := (*client).Post().
 		Namespace(namespace).
 		Resource("pods").
 		Name(pod).
@@ -81,27 +77,4 @@ func NewPortForwarder(client rest.Interface, clientConfig *rest.Config, namespac
 	})
 
 	return &f, nil
-}
-
-func ForwardGetRequest(client kubernetes.ClientInterface, namespace, podName string, localPort, destinationPort int, path string) ([]byte, error) {
-	f, err := client.GetPodPortForwarder(namespace, podName, fmt.Sprintf("%d:%d", localPort, destinationPort))
-	if err != nil {
-		return nil, err
-	}
-
-	// Start the forwarding
-	if err := (*f).Start(); err != nil {
-		return nil, err
-	}
-
-	// Defering the finish of the port-forwarding
-	defer (*f).Stop()
-
-	// Ready to create a request
-	resp, code, err := HttpGet(fmt.Sprintf("http://localhost:%d%s", localPort, path), nil, 10*time.Second)
-	if code >= 400 {
-		return resp, fmt.Errorf("error fetching the /config_dump for the Envoy. Response code: %d", code)
-	}
-
-	return resp, err
 }

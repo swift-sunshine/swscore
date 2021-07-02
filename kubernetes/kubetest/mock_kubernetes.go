@@ -11,6 +11,11 @@ import (
 	"github.com/kiali/kiali/util/httputil"
 )
 
+func (o *K8SClientMock) ForwardGetRequest(namespace, podName string, localPort, destinationPort int, path string) ([]byte, error) {
+	args := o.Called(namespace, podName, localPort, destinationPort, path)
+	return args.Get(0).([]byte), args.Error(1)
+}
+
 func (o *K8SClientMock) GetClusterServicesByLabels(labelsSelector string) ([]core_v1.Service, error) {
 	args := o.Called(labelsSelector)
 	return args.Get(0).([]core_v1.Service), args.Error(1)

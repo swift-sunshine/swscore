@@ -211,7 +211,7 @@ func (in *K8SClient) getIstiodDebugStatus(debugPath string) (map[string][]byte, 
 
 	// Check if the kube-api has proxy access to pods in the istio-system
 	// https://github.com/kiali/kiali/issues/3494#issuecomment-772486224
-	_, err = in.ForwardRequestToPod(c.IstioNamespace, istiods[0].Name, 8080, 8080, "/ready")
+	_, err = in.ForwardGetRequest(c.IstioNamespace, istiods[0].Name, 15014, 15014, "/healthz/ready")
 	if err != nil {
 		return nil, fmt.Errorf("unable to proxy Istiod pods. " +
 			"Make sure your Kubernetes API server has access to the Istio control plane through 8080 port")
@@ -221,14 +221,14 @@ func (in *K8SClient) getIstiodDebugStatus(debugPath string) (map[string][]byte, 
 	wg.Add(len(healthyIstiods))
 	errChan := make(chan error, len(healthyIstiods))
 	syncChan := make(chan map[string][]byte, len(healthyIstiods))
+	envoyLocalPort := config.Get().ExternalServices.Istio.EnvoyAdminLocalPort
 
 	result := map[string][]byte{}
-	for _, istiod := range healthyIstiods {
+	for i, istiod := range healthyIstiods {
 		go func(name, namespace string) {
 			defer wg.Done()
 
-			envoyLocalPort := config.Get().ExternalServices.Istio.EnvoyAdminLocalPort
-			res, err := in.ForwardRequestToPod(namespace, name, envoyLocalPort, 15014, debugPath)
+			res, err := in.ForwardGetRequest(namespace, name, envoyLocalPort + i, 15014, debugPath)
 			if err != nil {
 				errChan <- fmt.Errorf("%s: %s", name, err.Error())
 			} else {
@@ -316,10 +316,7 @@ func parseRegistryServices(registries map[string][]byte) ([]*RegistryStatus, err
 func (in *K8SClient) GetConfigDump(namespace, podName string) (*ConfigDump, error) {
 	// Fetching the config_dump data, raw.
 	envoyLocalPort := config.Get().ExternalServices.Istio.EnvoyAdminLocalPort
-	// TODO: need to remove envoy local port -> fetch available port dynamically
-	// Scenario: Two users consuming kiali at the same time. The pod will open the same port. One request will crash.
-	// However, there is a cache in place. So this is likely to happen
-	resp, err := in.ForwardRequestToPod(namespace, podName, envoyLocalPort, 15014, "/config_dump")
+	resp, err := in.ForwardGetRequest(namespace, podName, envoyLocalPort, 15014, "/config_dump")
 	if err != nil {
 		log.Errorf("Error fetching config_map: %v", err)
 		return nil, err

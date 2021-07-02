@@ -275,14 +275,14 @@ func (iss *IstioStatusService) getIstiodReachingCheck() (IstioComponentStatus, e
 	wg.Add(len(healthyIstiods))
 	syncChan := make(chan ComponentStatus, len(healthyIstiods))
 
-	for _, istiod := range healthyIstiods {
+	for i, istiod := range healthyIstiods {
 		go func(name, namespace string) {
 			defer wg.Done()
 			// Using the proxy method to make sure that K8s API has access to the Istio Control Plane namespace.
 			// By proxying one Istiod, we ensure that the following connection is allowed:
 			// Kiali -> K8s API (proxy) -> istiod
 			// This scenario is no obvious for private clusters (like GKE private cluster)
-			_, err := httputil.ForwardGetRequest(iss.k8s, namespace, name, 8080, 8080, "/ready")
+			_, err := iss.k8s.ForwardGetRequest(namespace, name, 15014 + i, 15021, "/healthz/ready")
 			if err != nil {
 				syncChan <- ComponentStatus{
 					Name:   name,
