@@ -2,11 +2,14 @@ package httputil
 
 import (
 	"io"
+	"net/http"
+	"os"
+	"strconv"
+	"strings"
+
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
-	"net/http"
-	"os"
 
 	"github.com/kiali/kiali/log"
 )
@@ -20,6 +23,7 @@ type forwarder struct {
 	forwarder *portforward.PortForwarder
 	ReadyCh   chan struct{}
 	StopCh    chan struct{}
+	localPort int
 }
 
 func (f forwarder) Start() error {
@@ -32,7 +36,7 @@ func (f forwarder) Start() error {
 	// Waiting until the ReadyChan has a value
 	select {
 	case err := <-errCh:
-		log.Errorf("Failing starting the port forwarding")
+		log.Error("Failing starting the port forwarding")
 		return err
 	case <-f.ReadyCh:
 		// Ready to forward requests
@@ -43,6 +47,10 @@ func (f forwarder) Start() error {
 func (f forwarder) Stop() {
 	// Closing the StopCh channel is closing the forwarding
 	close(f.StopCh)
+	err := FreePort(f.localPort)
+	if err != nil {
+		log.Errorf("Error stopping a port-forwarder: %v", err)
+	}
 }
 
 func NewPortForwarder(client *rest.Interface, clientConfig *rest.Config, namespace, pod, address, portMap string, writer io.Writer) (*PortForwarder, error) {
@@ -70,10 +78,17 @@ func NewPortForwarder(client *rest.Interface, clientConfig *rest.Config, namespa
 		return nil, err
 	}
 
+	localPort, err := strconv.Atoi(strings.Split(portMap, ":")[0])
+	if err != nil {
+		log.Errorf("wrong port mapping between local port and destination port: %v", err)
+		return nil, err
+	}
+
 	f := PortForwarder(forwarder{
 		forwarder: fwer,
 		ReadyCh:   readyCh,
 		StopCh:    stopCh,
+		localPort: localPort,
 	})
 
 	return &f, nil

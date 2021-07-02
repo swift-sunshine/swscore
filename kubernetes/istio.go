@@ -18,6 +18,7 @@ import (
 
 	"github.com/kiali/kiali/config"
 	"github.com/kiali/kiali/log"
+	"github.com/kiali/kiali/util/httputil"
 )
 
 var (
@@ -211,7 +212,7 @@ func (in *K8SClient) getIstiodDebugStatus(debugPath string) (map[string][]byte, 
 
 	// Check if the kube-api has proxy access to pods in the istio-system
 	// https://github.com/kiali/kiali/issues/3494#issuecomment-772486224
-	_, err = in.ForwardGetRequest(c.IstioNamespace, istiods[0].Name, 15014, 15014, "/healthz/ready")
+	_, err = in.ForwardGetRequest(c.IstioNamespace, istiods[0].Name, httputil.GetFreePort(), 8080, "/ready")
 	if err != nil {
 		return nil, fmt.Errorf("unable to proxy Istiod pods. " +
 			"Make sure your Kubernetes API server has access to the Istio control plane through 8080 port")
@@ -221,14 +222,13 @@ func (in *K8SClient) getIstiodDebugStatus(debugPath string) (map[string][]byte, 
 	wg.Add(len(healthyIstiods))
 	errChan := make(chan error, len(healthyIstiods))
 	syncChan := make(chan map[string][]byte, len(healthyIstiods))
-	envoyLocalPort := config.Get().ExternalServices.Istio.EnvoyAdminLocalPort
 
 	result := map[string][]byte{}
-	for i, istiod := range healthyIstiods {
+	for _, istiod := range healthyIstiods {
 		go func(name, namespace string) {
 			defer wg.Done()
 
-			res, err := in.ForwardGetRequest(namespace, name, envoyLocalPort + i, 15014, debugPath)
+			res, err := in.ForwardGetRequest(namespace, name, httputil.GetFreePort(), 15014, debugPath)
 			if err != nil {
 				errChan <- fmt.Errorf("%s: %s", name, err.Error())
 			} else {
@@ -315,8 +315,7 @@ func parseRegistryServices(registries map[string][]byte) ([]*RegistryStatus, err
 
 func (in *K8SClient) GetConfigDump(namespace, podName string) (*ConfigDump, error) {
 	// Fetching the config_dump data, raw.
-	envoyLocalPort := config.Get().ExternalServices.Istio.EnvoyAdminLocalPort
-	resp, err := in.ForwardGetRequest(namespace, podName, envoyLocalPort, 15014, "/config_dump")
+	resp, err := in.ForwardGetRequest(namespace, podName, httputil.GetFreePort(), 15014, "/config_dump")
 	if err != nil {
 		log.Errorf("Error fetching config_map: %v", err)
 		return nil, err

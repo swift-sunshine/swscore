@@ -69,7 +69,6 @@ type OSClientInterface interface {
 	UpdateProject(project string, jsonPatch string) (*osproject_v1.Project, error)
 }
 
-
 func (in *K8SClient) ForwardGetRequest(namespace, podName string, localPort, destinationPort int, path string) ([]byte, error) {
 	f, err := in.GetPodPortForwarder(namespace, podName, fmt.Sprintf("%d:%d", localPort, destinationPort))
 	if err != nil {
