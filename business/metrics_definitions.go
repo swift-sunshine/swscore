@@ -9,6 +9,16 @@ type istioMetric struct {
 
 var istioMetrics = []istioMetric{
 	{
+		kialiName: "grpc_received",
+		istioName: "istio_response_messages_total",
+		isHisto:   false,
+	},
+	{
+		kialiName: "grpc_sent",
+		istioName: "istio_request_messages_total",
+		isHisto:   false,
+	},
+	{
 		kialiName: "request_count",
 		istioName: "istio_requests_total",
 		isHisto:   false,

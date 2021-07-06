@@ -369,6 +369,22 @@ func getIstioCharts() []istioChart {
 	istioCharts := []istioChart{
 		{
 			Chart: models.Chart{
+				Name:  "gRPC received",
+				Unit:  "msgrate",
+				Spans: 3,
+			},
+			refName: "grpc_received",
+		},
+		{
+			Chart: models.Chart{
+				Name:  "gRPC sent",
+				Unit:  "msgrate",
+				Spans: 3,
+			},
+			refName: "grpc_sent",
+		},
+		{
+			Chart: models.Chart{
 				Name:  "Request volume",
 				Unit:  "ops",
 				Spans: 3,
