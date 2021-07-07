@@ -12,13 +12,13 @@ func TestGetFreePort(t *testing.T) {
 	ResetPool()
 
 	port := GetFreePort()
-	assert.Equal(15000, port)
+	assert.Equal(14100, port)
 
 	port = GetFreePort()
-	assert.Equal(15001, port)
+	assert.Equal(14101, port)
 
 	port = GetFreePort()
-	assert.Equal(15002, port)
+	assert.Equal(14102, port)
 }
 
 func TestGetFreePort_NoPortsAvailable(t *testing.T) {
@@ -28,10 +28,13 @@ func TestGetFreePort_NoPortsAvailable(t *testing.T) {
 
 	for i := 0; i < 100; i++ {
 		port := GetFreePort()
-		assert.Equal(15000+i, port)
+		assert.Equal(14100+i, port)
 	}
 
 	port := GetFreePort()
+	assert.Equal(0, port)
+
+	port = GetFreePort()
 	assert.Equal(0, port)
 }
 
@@ -50,29 +53,29 @@ func TestFreePort(t *testing.T) {
 	assert.Equal(0, port)
 
 	// Once you free one port, this is
-	err := FreePort(15004)
+	err := FreePort(14104)
 	port = GetFreePort()
 	assert.NoError(err)
-	assert.Equal(15004, port)
+	assert.Equal(14104, port)
 
 	port = GetFreePort()
 	assert.NoError(err)
 	assert.Equal(0, port)
 
-	err = FreePort(15004)
+	err = FreePort(14104)
 	port = GetFreePort()
 	assert.NoError(err)
-	assert.Equal(15004, port)
+	assert.Equal(14104, port)
 
-	err = FreePort(15099)
+	err = FreePort(14199)
 	port = GetFreePort()
 	assert.NoError(err)
-	assert.Equal(15099, port)
+	assert.Equal(14199, port)
 
-	err = FreePort(15000)
+	err = FreePort(14100)
 	port = GetFreePort()
 	assert.NoError(err)
-	assert.Equal(15000, port)
+	assert.Equal(14100, port)
 }
 
 func TestFreePort_OutOfRange(t *testing.T) {
@@ -84,10 +87,10 @@ func TestResetPortPool(t *testing.T) {
 	ResetPool()
 
 	port := GetFreePort()
-	assert.Equal(t, 15000, port)
+	assert.Equal(t, 14100, port)
 
 	ResetPool()
 
 	port = GetFreePort()
-	assert.Equal(t, 15000, port)
+	assert.Equal(t, 14100, port)
 }

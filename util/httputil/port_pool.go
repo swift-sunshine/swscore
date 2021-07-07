@@ -9,36 +9,36 @@ import (
 // [1501] => true // busy
 // [1502] => false // free
 // last port assigned => 1501
-var portRangeInit = 15000
+var portRangeInit = 14100
 var portRangeSize = 100
 var portsMap = map[int]bool{}
-var lastFreePort = portRangeInit
+var lastBusyPort = portRangeInit - 1
 var mutex sync.Mutex
 
-// GetFreePort returns a non-busy port available within the reserved port range (15000 - 15099).
+// GetFreePort returns a non-busy port available within the reserved port range (14100 - 14199).
 // The returned port is instantaneously marked as busy until is not freed using the FreePort method.
 func GetFreePort() int {
 	mutex.Lock()
 
-	busy := portsMap[lastFreePort]
+	busy := true
 	freePortFound := 0
 	attempts := 0
 	for busy && attempts < portRangeSize {
 		// If the pointer is getting out of range, restart from the beginning
-		if lastFreePort >= portRangeInit+portRangeSize-1 {
-			lastFreePort = portRangeInit
+		if lastBusyPort >= portRangeInit+portRangeSize-1 {
+			lastBusyPort = portRangeInit
 			// If the pointer is inside the range, increment by 1
 		} else {
-			lastFreePort++
+			lastBusyPort++
 		}
 
-		busy = portsMap[lastFreePort]
+		busy = portsMap[lastBusyPort]
 		attempts++
 	}
 
 	if !busy {
-		portsMap[lastFreePort] = true
-		freePortFound = lastFreePort
+		portsMap[lastBusyPort] = true
+		freePortFound = lastBusyPort
 	}
 
 	mutex.Unlock()
@@ -59,7 +59,7 @@ func FreePort(port int) (err error) {
 func ResetPool() {
 	mutex.Lock()
 
-	lastFreePort = portRangeInit
+	lastBusyPort = portRangeInit - 1
 	portsMap = map[int]bool{}
 
 	mutex.Unlock()
