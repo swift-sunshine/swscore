@@ -322,9 +322,9 @@ func parseRegistryServices(registries map[string][]byte) ([]*RegistryStatus, err
 
 func (in *K8SClient) GetConfigDump(namespace, podName string) (*ConfigDump, error) {
 	// Fetching the config_dump data, raw.
-	resp, err := in.ForwardGetRequest(namespace, podName, httputil.GetFreePort(), 15014, "/config_dump")
+	resp, err := in.ForwardGetRequest(namespace, podName, httputil.GetFreePort(), 15000, "/config_dump")
 	if err != nil {
-		log.Errorf("Error fetching config_map: %v", err)
+		log.Errorf("Error forwarding the /config_dump request: %v", err)
 		return nil, err
 	}
 
