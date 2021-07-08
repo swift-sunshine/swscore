@@ -5,15 +5,21 @@ import (
 	"sync"
 )
 
-// [1500] => true // busy
-// [1501] => true // busy
-// [1502] => false // free
-// last port assigned => 1501
-var portRangeInit = 14100
-var portRangeSize = 100
-var portsMap = map[int]bool{}
+// lastBusyPort is a pointer to the last free port given, therefore is in use.
 var lastBusyPort = portRangeInit - 1
+// mutex is the mutex used to solve concurrency problems while managing the port
 var mutex sync.Mutex
+// portsMap tracks whether an specific port is busy
+// portsMap[14100] = true => means that port 14100 is busy
+// portsMap[14101] = false => means that port 14101 is free
+var portsMap = map[int]bool{}
+// portRangeInit is the first port number managed in the pool
+var portRangeInit = 14100
+// portRangeSize is the size of the port range.
+// for example, the pool with portRangeSize 100 and portRangeInit 14000 manages
+// the ports from 14000 to 14099.
+var portRangeSize = 100
+
 
 // GetFreePort returns a non-busy port available within the reserved port range (14100 - 14199).
 // The returned port is instantaneously marked as busy until is not freed using the FreePort method.
