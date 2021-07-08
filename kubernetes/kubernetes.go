@@ -368,10 +368,15 @@ func (in *K8SClient) GetPodPortForwarder(namespace, name, portMap string) (*http
 	}
 
 	// First try whether the pod exist or not
-	_, err = in.GetPod(namespace, name)
+	pod, err := in.GetPod(namespace, name)
 	if err != nil {
 		log.Errorf("Couldn't fetch the Pod: %v", err)
 		return nil, err
+	}
+
+	// Prevent the forward if the pod is not running
+	if pod.Status.Phase != core_v1.PodRunning {
+		return nil, fmt.Errorf("error creating a pod forwarder for a non-running pod: %s/%s", namespace, name)
 	}
 
 	// Create a Port Forwarder

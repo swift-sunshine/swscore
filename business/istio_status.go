@@ -266,7 +266,7 @@ func (iss *IstioStatusService) getIstiodReachingCheck() (IstioComponentStatus, e
 
 	healthyIstiods := make([]*core_v1.Pod, 0, len(istiods))
 	for i, istiod := range istiods {
-		if istiod.Status.Phase == "Running" {
+		if istiod.Status.Phase == core_v1.PodRunning {
 			healthyIstiods = append(healthyIstiods, &istiods[i])
 		}
 	}
