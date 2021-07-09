@@ -121,7 +121,12 @@ func TestResponseThroughput(t *testing.T) {
 				Duration: duration,
 			},
 		},
-		QueryTime:      time.Now().Unix(),
+		QueryTime: time.Now().Unix(),
+		Rates: graph.RequestedRates{
+			Grpc: graph.RateRequests,
+			Http: graph.RateRequests,
+			Tcp:  graph.RateTotal,
+		},
 		ThroughputType: "response",
 	}
 
@@ -209,14 +214,14 @@ func responseThroughputTestTraffic() graph.TrafficMap {
 	trafficMap[ratingsService.ID] = &ratingsService
 	trafficMap[ratings.ID] = &ratings
 
-	ingress.AddEdge(&productpageService)
-	productpageService.AddEdge(&productpage)
-	productpage.AddEdge(&reviewsService)
-	reviewsService.AddEdge(&reviewsV1)
-	reviewsService.AddEdge(&reviewsV2)
-	reviewsV1.AddEdge(&ratingsService)
-	reviewsV2.AddEdge(&ratingsService)
-	ratingsService.AddEdge(&ratings)
+	ingress.AddEdge(&productpageService).Metadata[graph.ProtocolKey] = "http"
+	productpageService.AddEdge(&productpage).Metadata[graph.ProtocolKey] = "http"
+	productpage.AddEdge(&reviewsService).Metadata[graph.ProtocolKey] = "http"
+	reviewsService.AddEdge(&reviewsV1).Metadata[graph.ProtocolKey] = "http"
+	reviewsService.AddEdge(&reviewsV2).Metadata[graph.ProtocolKey] = "http"
+	reviewsV1.AddEdge(&ratingsService).Metadata[graph.ProtocolKey] = "http"
+	reviewsV2.AddEdge(&ratingsService).Metadata[graph.ProtocolKey] = "http"
+	ratingsService.AddEdge(&ratings).Metadata[graph.ProtocolKey] = "http"
 
 	return trafficMap
 }
@@ -287,7 +292,12 @@ func TestRequestThroughput(t *testing.T) {
 				Duration: duration,
 			},
 		},
-		QueryTime:      time.Now().Unix(),
+		QueryTime: time.Now().Unix(),
+		Rates: graph.RequestedRates{
+			Grpc: graph.RateRequests,
+			Http: graph.RateRequests,
+			Tcp:  graph.RateTotal,
+		},
 		ThroughputType: "request",
 	}
 
@@ -321,6 +331,111 @@ func TestRequestThroughput(t *testing.T) {
 	assert.Equal(0, len(reviewsService.Edges))
 }
 
+func TestRequestThroughputSkipRates(t *testing.T) {
+	assert := assert.New(t)
+
+	q0 := `round(sum(rate(istio_request_bytes_sum{reporter="source",source_workload_namespace!="bookinfo",destination_service_namespace="bookinfo"}[60s])) by (source_cluster,source_workload_namespace,source_workload,source_canonical_service,source_canonical_revision,destination_cluster,destination_service_namespace,destination_service,destination_service_name,destination_workload_namespace,destination_workload,destination_canonical_service,destination_canonical_revision) > 0,0.001)`
+	q0m0 := model.Metric{
+		"source_workload_namespace":      "istio-system",
+		"source_workload":                "ingressgateway-unknown",
+		"source_canonical_service":       "ingressgateway",
+		"source_canonical_revision":      model.LabelValue(graph.Unknown),
+		"destination_service_namespace":  "bookinfo",
+		"destination_service":            "productpage.bookinfo.svc.cluster.local",
+		"destination_service_name":       "productpage",
+		"destination_workload_namespace": "bookinfo",
+		"destination_workload":           "productpage-v1",
+		"destination_canonical_service":  "productpage",
+		"destination_canonical_revision": "v1"}
+	v0 := model.Vector{
+		&model.Sample{
+			Metric: q0m0,
+			Value:  1000.0},
+	}
+
+	q1 := `round(sum(rate(istio_request_bytes_sum{reporter="source",source_workload_namespace="bookinfo"}[60s])) by (source_cluster,source_workload_namespace,source_workload,source_canonical_service,source_canonical_revision,destination_cluster,destination_service_namespace,destination_service,destination_service_name,destination_workload_namespace,destination_workload,destination_canonical_service,destination_canonical_revision) > 0,0.001)`
+	q1m0 := model.Metric{
+		"source_workload_namespace":      "bookinfo",
+		"source_workload":                "productpage-v1",
+		"source_canonical_service":       "productpage",
+		"source_canonical_revision":      "v1",
+		"destination_service_namespace":  "bookinfo",
+		"destination_service":            "reviews.bookinfo.svc.cluster.local",
+		"destination_service_name":       "reviews",
+		"destination_workload_namespace": "unknown", // simulate failed requests to reviews service
+		"destination_workload":           "unknown",
+		"destination_canonical_service":  "unknown",
+		"destination_canonical_revision": "unknown"}
+	v1 := model.Vector{
+		&model.Sample{
+			Metric: q1m0,
+			Value:  1000.0}}
+
+	_, api, err := setupMocked()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	mockQuery(api, q0, &v0)
+	mockQuery(api, q1, &v1)
+
+	trafficMap := requestThroughputTestTraffic()
+	ingressID, _ := graph.Id(graph.Unknown, "istio-system", "", "istio-system", "ingressgateway-unknown", "ingressgateway", graph.Unknown, graph.GraphTypeVersionedApp)
+	ingress, ok := trafficMap[ingressID]
+	assert.Equal(true, ok)
+	assert.Equal("ingressgateway", ingress.App)
+	assert.Equal(1, len(ingress.Edges))
+	assert.Equal(nil, ingress.Edges[0].Metadata[graph.Throughput])
+
+	duration, _ := time.ParseDuration("60s")
+	appender := ThroughputAppender{
+		GraphType:          graph.GraphTypeVersionedApp,
+		InjectServiceNodes: true,
+		Namespaces: map[string]graph.NamespaceInfo{
+			"bookinfo": {
+				Name:     "bookinfo",
+				Duration: duration,
+			},
+		},
+		QueryTime: time.Now().Unix(),
+		Rates: graph.RequestedRates{
+			Grpc: graph.RateRequests,
+			Http: graph.RateNone,
+			Tcp:  graph.RateTotal,
+		},
+		ThroughputType: "request",
+	}
+
+	appender.AppendGraph(trafficMap, nil, nil)
+
+	ingress, ok = trafficMap[ingressID]
+	assert.Equal(true, ok)
+	assert.Equal("ingressgateway", ingress.App)
+	assert.Equal(1, len(ingress.Edges))
+	_, ok = ingress.Edges[0].Metadata[graph.Throughput]
+	assert.Equal(false, ok)
+
+	productpageService := ingress.Edges[0].Dest
+	assert.Equal(graph.NodeTypeService, productpageService.NodeType)
+	assert.Equal("productpage", productpageService.Service)
+	assert.Equal(nil, productpageService.Metadata[graph.Throughput])
+	assert.Equal(1, len(productpageService.Edges))
+	assert.Equal(nil, productpageService.Edges[0].Metadata[graph.Throughput])
+
+	productpage := productpageService.Edges[0].Dest
+	assert.Equal("productpage", productpage.App)
+	assert.Equal("v1", productpage.Version)
+	assert.Equal(nil, productpage.Metadata[graph.Throughput])
+	assert.Equal(1, len(productpage.Edges))
+	assert.Equal(nil, productpage.Edges[0].Metadata[graph.Throughput])
+
+	reviewsService := productpage.Edges[0].Dest
+	assert.Equal(graph.NodeTypeService, reviewsService.NodeType)
+	assert.Equal("reviews", reviewsService.Service)
+	assert.Equal(nil, reviewsService.Metadata[graph.Throughput])
+	assert.Equal(0, len(reviewsService.Edges))
+}
+
 func requestThroughputTestTraffic() graph.TrafficMap {
 	ingress := graph.NewNode(graph.Unknown, "istio-system", "", "istio-system", "ingressgateway-unknown", "ingressgateway", graph.Unknown, graph.GraphTypeVersionedApp)
 	productpageService := graph.NewNode(graph.Unknown, "bookinfo", "productpage", "", "", "", "", graph.GraphTypeVersionedApp)
@@ -333,9 +448,9 @@ func requestThroughputTestTraffic() graph.TrafficMap {
 	trafficMap[productpage.ID] = &productpage
 	trafficMap[reviewsService.ID] = &reviewsService
 
-	ingress.AddEdge(&productpageService)
-	productpageService.AddEdge(&productpage)
-	productpage.AddEdge(&reviewsService)
+	ingress.AddEdge(&productpageService).Metadata[graph.ProtocolKey] = "http"
+	productpageService.AddEdge(&productpage).Metadata[graph.ProtocolKey] = "http"
+	productpage.AddEdge(&reviewsService).Metadata[graph.ProtocolKey] = "http"
 
 	return trafficMap
 }

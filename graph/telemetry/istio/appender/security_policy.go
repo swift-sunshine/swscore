@@ -25,6 +25,7 @@ type SecurityPolicyAppender struct {
 	InjectServiceNodes bool
 	Namespaces         map[string]graph.NamespaceInfo
 	QueryTime          int64 // unix time in seconds
+	Rates              graph.RequestedRates
 }
 
 type PolicyRates map[string]float64
@@ -50,39 +51,134 @@ func (a SecurityPolicyAppender) AppendGraph(trafficMap graph.TrafficMap, globalI
 }
 
 func (a SecurityPolicyAppender) appendGraph(trafficMap graph.TrafficMap, namespace string, client *prometheus.Client) {
-	log.Tracef("Resolving security policy for namespace = %v", namespace)
+	log.Tracef("Resolving security policy for namespace [%v], rates [%+v]", namespace, a.Rates)
 	duration := a.Namespaces[namespace].Duration
 
 	// query prometheus for mutual_tls info in two queries (use dest telemetry because it reports the security policy):
 	// 1) query for requests originating from a workload outside the namespace.
 	groupBy := "source_cluster,source_workload_namespace,source_workload,source_canonical_service,source_canonical_revision,source_principal,destination_cluster,destination_service_namespace,destination_service_name,destination_workload_namespace,destination_workload,destination_canonical_service,destination_canonical_revision,destination_principal,connection_security_policy"
-	httpQuery := fmt.Sprintf(`sum(rate(%s{reporter="destination",source_workload_namespace!="%v",destination_service_namespace="%v"}[%vs])) by (%s) > 0`,
-		"istio_requests_total",
-		namespace,
-		namespace,
-		int(duration.Seconds()), // range duration for the query
-		groupBy)
-	tcpQuery := fmt.Sprintf(`sum(rate(%s{reporter="destination",source_workload_namespace!="%v",destination_service_namespace="%v"}[%vs])) by (%s) > 0`,
-		"istio_tcp_sent_bytes_total",
-		namespace,
-		namespace,
-		int(duration.Seconds()), // range duration for the query
-		groupBy)
-	query := fmt.Sprintf(`(%s) OR (%s)`, httpQuery, tcpQuery)
+	var query string
+	if a.Rates.Grpc == graph.RateRequests || a.Rates.Http == graph.RateRequests {
+		requestsQuery := fmt.Sprintf(`sum(rate(%s{reporter="destination",source_workload_namespace!="%v",destination_service_namespace="%v"}[%vs])) by (%s) > 0`,
+			"istio_requests_total",
+			namespace,
+			namespace,
+			int(duration.Seconds()), // range duration for the query
+			groupBy)
+		query = fmt.Sprintf(`(%s)`, requestsQuery)
+	}
+	if a.Rates.Grpc == graph.RateSent || a.Rates.Grpc == graph.RateTotal {
+		grpcSentQuery := fmt.Sprintf(`sum(rate(%s{reporter="destination",source_workload_namespace!="%v",destination_service_namespace="%v"}[%vs])) by (%s) > 0`,
+			"istio_request_messages_total",
+			namespace,
+			namespace,
+			int(duration.Seconds()), // range duration for the query
+			groupBy)
+		if query == "" {
+			query = fmt.Sprintf(`(%s)`, grpcSentQuery)
+		} else {
+			query = fmt.Sprintf(`%s OR (%s)`, query, grpcSentQuery)
+		}
+	}
+	if a.Rates.Grpc == graph.RateReceived || a.Rates.Grpc == graph.RateTotal {
+		grpcReceivedQuery := fmt.Sprintf(`sum(rate(%s{reporter="destination",source_workload_namespace!="%v",destination_service_namespace="%v"}[%vs])) by (%s) > 0`,
+			"istio_response_messages_total",
+			namespace,
+			namespace,
+			int(duration.Seconds()), // range duration for the query
+			groupBy)
+		if query == "" {
+			query = fmt.Sprintf(`(%s)`, grpcReceivedQuery)
+		} else {
+			query = fmt.Sprintf(`%s OR (%s)`, query, grpcReceivedQuery)
+		}
+	}
+	if a.Rates.Tcp == graph.RateSent || a.Rates.Tcp == graph.RateTotal {
+		tcpSentQuery := fmt.Sprintf(`sum(rate(%s{reporter="destination",source_workload_namespace!="%v",destination_service_namespace="%v"}[%vs])) by (%s) > 0`,
+			"istio_tcp_sent_bytes_total",
+			namespace,
+			namespace,
+			int(duration.Seconds()), // range duration for the query
+			groupBy)
+		if query == "" {
+			query = fmt.Sprintf(`(%s)`, tcpSentQuery)
+		} else {
+			query = fmt.Sprintf(`%s OR (%s)`, query, tcpSentQuery)
+		}
+	}
+	if a.Rates.Tcp == graph.RateReceived || a.Rates.Tcp == graph.RateTotal {
+		tcpReceivedQuery := fmt.Sprintf(`sum(rate(%s{reporter="destination",source_workload_namespace!="%v",destination_service_namespace="%v"}[%vs])) by (%s) > 0`,
+			"istio_tcp_received_bytes_total",
+			namespace,
+			namespace,
+			int(duration.Seconds()), // range duration for the query
+			groupBy)
+		if query == "" {
+			query = fmt.Sprintf(`(%s)`, tcpReceivedQuery)
+		} else {
+			query = fmt.Sprintf(`%s OR (%s)`, query, tcpReceivedQuery)
+		}
+	}
 	outVector := promQuery(query, time.Unix(a.QueryTime, 0), client.GetContext(), client.API(), a)
 
 	// 2) query for requests originating from a workload inside of the namespace
-	httpQuery = fmt.Sprintf(`sum(rate(%s{reporter="destination",source_workload_namespace="%v"}[%vs])) by (%s) > 0`,
-		"istio_requests_total",
-		namespace,
-		int(duration.Seconds()), // range duration for the query
-		groupBy)
-	tcpQuery = fmt.Sprintf(`sum(rate(%s{reporter="destination",source_workload_namespace="%v"}[%vs])) by (%s) > 0`,
-		"istio_tcp_sent_bytes_total",
-		namespace,
-		int(duration.Seconds()), // range duration for the query
-		groupBy)
-	query = fmt.Sprintf(`(%s) OR (%s)`, httpQuery, tcpQuery)
+	query = ""
+	if a.Rates.Grpc == graph.RateRequests || a.Rates.Http == graph.RateRequests {
+		requestsQuery := fmt.Sprintf(`sum(rate(%s{reporter="destination",source_workload_namespace="%v"}[%vs])) by (%s) > 0`,
+			"istio_requests_total",
+			namespace,
+			int(duration.Seconds()), // range duration for the query
+			groupBy)
+		query = fmt.Sprintf(`(%s)`, requestsQuery)
+	}
+	if a.Rates.Grpc == graph.RateSent || a.Rates.Grpc == graph.RateTotal {
+		grpcSentQuery := fmt.Sprintf(`sum(rate(%s{reporter="destination",source_workload_namespace="%v"}[%vs])) by (%s) > 0`,
+			"istio_request_messages_total",
+			namespace,
+			int(duration.Seconds()), // range duration for the query
+			groupBy)
+		if query == "" {
+			query = fmt.Sprintf(`(%s)`, grpcSentQuery)
+		} else {
+			query = fmt.Sprintf(`%s OR (%s)`, query, grpcSentQuery)
+		}
+	}
+	if a.Rates.Grpc == graph.RateReceived || a.Rates.Grpc == graph.RateTotal {
+		grpcReceivedQuery := fmt.Sprintf(`sum(rate(%s{reporter="destination",source_workload_namespace="%v"}[%vs])) by (%s) > 0`,
+			"istio_response_messages_total",
+			namespace,
+			int(duration.Seconds()), // range duration for the query
+			groupBy)
+		if query == "" {
+			query = fmt.Sprintf(`(%s)`, grpcReceivedQuery)
+		} else {
+			query = fmt.Sprintf(`%s OR (%s)`, query, grpcReceivedQuery)
+		}
+	}
+	if a.Rates.Tcp == graph.RateSent || a.Rates.Tcp == graph.RateTotal {
+		tcpSentQuery := fmt.Sprintf(`sum(rate(%s{reporter="destination",source_workload_namespace="%v"}[%vs])) by (%s) > 0`,
+			"istio_tcp_sent_bytes_total",
+			namespace,
+			int(duration.Seconds()), // range duration for the query
+			groupBy)
+		if query == "" {
+			query = fmt.Sprintf(`(%s)`, tcpSentQuery)
+		} else {
+			query = fmt.Sprintf(`%s OR (%s)`, query, tcpSentQuery)
+		}
+	}
+	if a.Rates.Tcp == graph.RateReceived || a.Rates.Tcp == graph.RateTotal {
+		tcpReceivedQuery := fmt.Sprintf(`sum(rate(%s{reporter="destination",source_workload_namespace="%v"}[%vs])) by (%s) > 0`,
+			"istio_tcp_received_bytes_total",
+			namespace,
+			int(duration.Seconds()), // range duration for the query
+			groupBy)
+		if query == "" {
+			query = fmt.Sprintf(`(%s)`, tcpReceivedQuery)
+		} else {
+			query = fmt.Sprintf(`%s OR (%s)`, query, tcpReceivedQuery)
+		}
+	}
 	inVector := promQuery(query, time.Unix(a.QueryTime, 0), client.GetContext(), client.API(), a)
 
 	// create map to quickly look up securityPolicy
@@ -113,7 +209,7 @@ func (a SecurityPolicyAppender) populateSecurityPolicyMap(securityPolicyMap map[
 		lDestPrincipal, destPrincipalOk := m["destination_principal"]
 		lCsp, cspOk := m["connection_security_policy"]
 
-		if !sourceWlNsOk || !sourceWlOk || !sourceAppOk || !sourceVerOk || !destSvcNsOk || !destSvcNameOk || !destWlNsOk || !destWlOk || !destAppOk || !destVerOk || !sourcePrincipalOk || !destPrincipalOk || !cspOk {
+		if !sourceWlNsOk || !sourceWlOk || !sourceAppOk || !sourceVerOk || !destSvcNsOk || !destSvcNameOk || !destWlNsOk || !destWlOk || !destAppOk || !destVerOk || !sourcePrincipalOk || !destPrincipalOk {
 			log.Warningf("populateSecurityPolicyMap: Skipping %s, missing expected labels", m.String())
 			continue
 		}
@@ -130,7 +226,11 @@ func (a SecurityPolicyAppender) populateSecurityPolicyMap(securityPolicyMap map[
 		destApp := string(lDestApp)
 		destVer := string(lDestVer)
 		destPrincipal := string(lDestPrincipal)
-		csp := string(lCsp)
+		// connection_security_policy is not set on gRPC message metrics
+		csp := graph.Unknown
+		if cspOk {
+			csp = string(lCsp)
+		}
 
 		val := float64(s.Value)
 

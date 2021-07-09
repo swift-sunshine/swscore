@@ -18,6 +18,7 @@ const (
 
 // AggregateNodeAppender is responsible for injecting aggregate nodes into the graph to gain
 // visibility into traffic aggregations for a user-specfied metric attribute.
+// Note: Aggregate Nodes are supported only on Requests traffic (not TCP or gRPC-message traffic)
 type AggregateNodeAppender struct {
 	Aggregate          string
 	AggregateValue     string
@@ -25,6 +26,7 @@ type AggregateNodeAppender struct {
 	InjectServiceNodes bool
 	Namespaces         map[string]graph.NamespaceInfo
 	QueryTime          int64 // unix time in seconds
+	Rates              graph.RequestedRates
 	Service            string
 }
 
@@ -36,6 +38,11 @@ func (a AggregateNodeAppender) Name() string {
 // AppendGraph implements Appender
 func (a AggregateNodeAppender) AppendGraph(trafficMap graph.TrafficMap, globalInfo *graph.AppenderGlobalInfo, namespaceInfo *graph.AppenderNamespaceInfo) {
 	if len(trafficMap) == 0 {
+		return
+	}
+
+	// Aggregate Nodes are currently supported only on Requests traffic (not TCP or gRPC-message traffic)
+	if a.Rates.Grpc != graph.RateRequests && a.Rates.Http != graph.RateRequests {
 		return
 	}
 
@@ -70,17 +77,6 @@ func (a AggregateNodeAppender) appendGraph(trafficMap graph.TrafficMap, namespac
 		a.Aggregate,
 		int(duration.Seconds()), // range duration for the query
 		groupBy)
-	/* It's not clear that request classification makes sense for TCP metrics. Because it costs us queries I'm
-	   removing the support for now, we can add it back if someone presents a valid use case.
-	tcpQuery := fmt.Sprintf(`sum(rate(%s{reporter="destination",source_workload_namespace!="%s",destination_service_namespace="%v",%s!="unknown"}[%vs])) by (%s) > 0`,
-		"istio_tcp_sent_bytes_total",
-		namespace,
-		namespace,
-		a.Aggregate,
-		int(duration.Seconds()), // range duration for the query
-		groupBy)
-	query := fmt.Sprintf(`(%s) OR (%s)`, httpQuery, tcpQuery)
-	*/
 	query := httpQuery
 	vector := promQuery(query, time.Unix(a.QueryTime, 0), client.GetContext(), client.API(), a)
 	a.injectAggregates(trafficMap, &vector)
@@ -92,15 +88,6 @@ func (a AggregateNodeAppender) appendGraph(trafficMap graph.TrafficMap, namespac
 		a.Aggregate,
 		int(duration.Seconds()), // range duration for the query
 		groupBy)
-	/* See comment above...
-	tcpQuery = fmt.Sprintf(`sum(rate(%s{reporter="destination",source_workload_namespace="%s",%s!="unknown"}[%vs])) by (%s) > 0`,
-		"istio_tcp_sent_bytes_total",
-		namespace,
-		a.Aggregate,
-		int(duration.Seconds()), // range duration for the query
-		groupBy)
-	query = fmt.Sprintf(`(%s) OR (%s)`, httpQuery, tcpQuery)
-	*/
 	query = httpQuery
 	vector = promQuery(query, time.Unix(a.QueryTime, 0), client.GetContext(), client.API(), a)
 	a.injectAggregates(trafficMap, &vector)
@@ -126,23 +113,15 @@ func (a AggregateNodeAppender) appendNodeGraph(trafficMap graph.TrafficMap, name
 		serviceFragment,
 		int(duration.Seconds()), // range duration for the query
 		groupBy)
-	/* See comment above...
-	tcpQuery := fmt.Sprintf(`sum(rate(%s{reporter="destination",destination_service_namespace="%s",%s="%s"%s}[%vs])) by (%s) > 0`,
-		"istio_tcp_sent_bytes_total",
-		namespace,
-		a.Aggregate,
-		a.AggregateValue,
-		serviceFragment,
-		int(duration.Seconds()), // range duration for the query
-		groupBy)
-	query := fmt.Sprintf(`(%s) OR (%s)`, httpQuery, tcpQuery)
-	*/
 	query := httpQuery
 	vector := promQuery(query, time.Unix(a.QueryTime, 0), client.GetContext(), client.API(), a)
 	a.injectAggregates(trafficMap, &vector)
 }
 
 func (a AggregateNodeAppender) injectAggregates(trafficMap graph.TrafficMap, vector *model.Vector) {
+	skipRequestsGrpc := a.Rates.Grpc != graph.RateRequests
+	skipRequestsHttp := a.Rates.Http != graph.RateRequests
+
 	for _, s := range *vector {
 		m := s.Metric
 		lSourceCluster, sourceClusterOk := m["source_cluster"]
@@ -158,17 +137,17 @@ func (a AggregateNodeAppender) injectAggregates(trafficMap graph.TrafficMap, vec
 		lDestWl, destWlOk := m["destination_workload"]
 		lDestApp, destAppOk := m["destination_canonical_service"]
 		lDestVer, destVerOk := m["destination_canonical_revision"]
-		lCode := m["response_code"]                // will be missing for TCP
+		lCode := m["response_code"]
 		lGrpc, grpcOk := m["grpc_response_status"] // will be missing for non-GRPC
 		lFlags, flagsOk := m["response_flags"]
-		lProtocol, protocolOk := m["request_protocol"]
+		lProtocol, protocolOk := m["request_protocol"]             // because currently we only support requests traffic the protocol should be set
 		lAggregate, aggregateOk := m[model.LabelName(a.Aggregate)] // may be unset, see note above
 
 		if !aggregateOk {
 			continue
 		}
 
-		if !sourceWlNsOk || !sourceWlOk || !sourceAppOk || !sourceVerOk || !destSvcNsOk || !destSvcOk || !destSvcNameOk || !destWlNsOk || !destWlOk || !destAppOk || !destVerOk || !flagsOk {
+		if !sourceWlNsOk || !sourceWlOk || !sourceAppOk || !sourceVerOk || !destSvcNsOk || !destSvcOk || !destSvcNameOk || !destWlNsOk || !destWlOk || !destAppOk || !destVerOk || !flagsOk || !protocolOk {
 			log.Warningf("Skipping %v, missing expected labels", m.String())
 			continue
 		}
@@ -183,6 +162,10 @@ func (a AggregateNodeAppender) injectAggregates(trafficMap graph.TrafficMap, vec
 		flags := string(lFlags)
 		aggregate := string(lAggregate)
 
+		if (skipRequestsHttp && protocol == graph.HTTP.Name) || (skipRequestsGrpc && protocol == graph.GRPC.Name) {
+			continue
+		}
+
 		// handle clusters
 		sourceCluster, destCluster := util.HandleClusters(lSourceCluster, sourceClusterOk, lDestCluster, destClusterOk)
 
@@ -194,7 +177,7 @@ func (a AggregateNodeAppender) injectAggregates(trafficMap graph.TrafficMap, vec
 			// set response code in a backward compatible way
 			code = util.HandleResponseCode(protocol, code, grpcOk, string(lGrpc))
 		} else {
-			// because we are not currently supporting TCP requests, the protocol should be set
+			// because currently we only support requests traffic the protocol should be set
 			log.Warningf("Skipping %v, missing expected protocol label", m.String())
 			continue
 			// protocol = "tcp"

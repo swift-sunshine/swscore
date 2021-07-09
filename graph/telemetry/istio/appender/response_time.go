@@ -32,6 +32,7 @@ type ResponseTimeAppender struct {
 	Namespaces         graph.NamespaceInfoMap
 	Quantile           float64
 	QueryTime          int64 // unix time in seconds
+	Rates              graph.RequestedRates
 }
 
 // Name implements Appender
@@ -42,6 +43,11 @@ func (a ResponseTimeAppender) Name() string {
 // AppendGraph implements Appender
 func (a ResponseTimeAppender) AppendGraph(trafficMap graph.TrafficMap, globalInfo *graph.AppenderGlobalInfo, namespaceInfo *graph.AppenderNamespaceInfo) {
 	if len(trafficMap) == 0 {
+		return
+	}
+
+	// Response times only apply to request traffic (not TCP or gRPC-message traffic)
+	if a.Rates.Grpc != graph.RateRequests && a.Rates.Http != graph.RateRequests {
 		return
 	}
 
@@ -64,7 +70,7 @@ func (a ResponseTimeAppender) appendGraph(trafficMap graph.TrafficMap, namespace
 		log.Tracef("Generating average responseTime; namespace = %v", namespace)
 
 		// query prometheus for the responseTime info in two queries:
-		groupBy := "source_cluster,source_workload_namespace,source_workload,source_canonical_service,source_canonical_revision,destination_cluster,destination_service_namespace,destination_service,destination_service_name,destination_workload_namespace,destination_workload,destination_canonical_service,destination_canonical_revision"
+		groupBy := "source_cluster,source_workload_namespace,source_workload,source_canonical_service,source_canonical_revision,destination_cluster,destination_service_namespace,destination_service,destination_service_name,destination_workload_namespace,destination_workload,destination_canonical_service,destination_canonical_revision,request_protocol"
 
 		// 1) Incoming: query destination telemetry to capture namespace services' incoming traffic
 		// note - the query order is important as both queries may have overlapping results for edges within
@@ -98,7 +104,7 @@ func (a ResponseTimeAppender) appendGraph(trafficMap graph.TrafficMap, namespace
 		log.Tracef("Generating responseTime for quantile [%.2f]; namespace = %v", quantile, namespace)
 
 		// query prometheus for the responseTime info in two queries:
-		groupBy := "le,source_cluster,source_workload_namespace,source_workload,source_canonical_service,source_canonical_revision,destination_cluster,destination_service_namespace,destination_service,destination_service_name,destination_workload_namespace,destination_workload,destination_canonical_service,destination_canonical_revision"
+		groupBy := "le,source_cluster,source_workload_namespace,source_workload,source_canonical_service,source_canonical_revision,destination_cluster,destination_service_namespace,destination_service,destination_service_name,destination_workload_namespace,destination_workload,destination_canonical_service,destination_canonical_revision,request_protocol"
 
 		// 1) Incoming: query destination telemetry to capture namespace services' incoming traffic
 		// note - the query order is important as both queries may have overlapping results for edges within
@@ -129,7 +135,7 @@ func (a ResponseTimeAppender) appendGraph(trafficMap graph.TrafficMap, namespace
 func applyResponseTime(trafficMap graph.TrafficMap, responseTimeMap map[string]float64) {
 	for _, n := range trafficMap {
 		for _, e := range n.Edges {
-			key := fmt.Sprintf("%s %s", e.Source.ID, e.Dest.ID)
+			key := fmt.Sprintf("%s %s %s", e.Source.ID, e.Dest.ID, e.Metadata[graph.ProtocolKey].(string))
 			if val, ok := responseTimeMap[key]; ok {
 				e.Metadata[graph.ResponseTime] = val
 			}
@@ -138,6 +144,9 @@ func applyResponseTime(trafficMap graph.TrafficMap, responseTimeMap map[string]f
 }
 
 func (a ResponseTimeAppender) populateResponseTimeMap(responseTimeMap map[string]float64, vector *model.Vector) {
+	skipRequestsGrpc := a.Rates.Grpc != graph.RateRequests
+	skipRequestsHttp := a.Rates.Http != graph.RateRequests
+
 	for _, s := range *vector {
 		m := s.Metric
 		lSourceCluster, sourceClusterOk := m["source_cluster"]
@@ -153,8 +162,9 @@ func (a ResponseTimeAppender) populateResponseTimeMap(responseTimeMap map[string
 		lDestWl, destWlOk := m["destination_workload"]
 		lDestApp, destAppOk := m["destination_canonical_service"]
 		lDestVer, destVerOk := m["destination_canonical_revision"]
+		lProtocol, protocolOk := m["request_protocol"]
 
-		if !sourceWlNsOk || !sourceWlOk || !sourceAppOk || !sourceVerOk || !destSvcNsOk || !destSvcNameOk || !destSvcOk || !destWlNsOk || !destWlOk || !destAppOk || !destVerOk {
+		if !sourceWlNsOk || !sourceWlOk || !sourceAppOk || !sourceVerOk || !destSvcNsOk || !destSvcNameOk || !destSvcOk || !destWlNsOk || !destWlOk || !destAppOk || !destVerOk || !protocolOk {
 			log.Warningf("populateResponseTimeMap: Skipping %s, missing expected labels", m.String())
 			continue
 		}
@@ -164,6 +174,11 @@ func (a ResponseTimeAppender) populateResponseTimeMap(responseTimeMap map[string
 		sourceApp := string(lSourceApp)
 		sourceVer := string(lSourceVer)
 		destSvc := string(lDestSvc)
+		protocol := string(lProtocol)
+
+		if (skipRequestsHttp && protocol == graph.HTTP.Name) || (skipRequestsGrpc && protocol == graph.GRPC.Name) {
+			continue
+		}
 
 		// handle clusters
 		sourceCluster, destCluster := util.HandleClusters(lSourceCluster, sourceClusterOk, lDestCluster, destClusterOk)
@@ -195,17 +210,17 @@ func (a ResponseTimeAppender) populateResponseTimeMap(responseTimeMap map[string
 
 		if inject {
 			// Only set response time on the outgoing edge. On the incoming edge, we can't validly aggregate response times of the outgoing edges (kiali-2297)
-			a.addResponseTime(responseTimeMap, val, destCluster, destSvcNs, destSvcName, "", "", "", destCluster, destSvcNs, destSvcName, destWlNs, destWl, destApp, destVer)
+			a.addResponseTime(responseTimeMap, val, protocol, destCluster, destSvcNs, destSvcName, "", "", "", destCluster, destSvcNs, destSvcName, destWlNs, destWl, destApp, destVer)
 		} else {
-			a.addResponseTime(responseTimeMap, val, sourceCluster, sourceWlNs, "", sourceWl, sourceApp, sourceVer, destCluster, destSvcNs, destSvcName, destWlNs, destWl, destApp, destVer)
+			a.addResponseTime(responseTimeMap, val, protocol, sourceCluster, sourceWlNs, "", sourceWl, sourceApp, sourceVer, destCluster, destSvcNs, destSvcName, destWlNs, destWl, destApp, destVer)
 		}
 	}
 }
 
-func (a ResponseTimeAppender) addResponseTime(responseTimeMap map[string]float64, val float64, sourceCluster, sourceNs, sourceSvc, sourceWl, sourceApp, sourceVer, destCluster, destSvcNs, destSvc, destWlNs, destWl, destApp, destVer string) {
+func (a ResponseTimeAppender) addResponseTime(responseTimeMap map[string]float64, val float64, protocol, sourceCluster, sourceNs, sourceSvc, sourceWl, sourceApp, sourceVer, destCluster, destSvcNs, destSvc, destWlNs, destWl, destApp, destVer string) {
 	sourceID, _ := graph.Id(sourceCluster, sourceNs, sourceSvc, sourceNs, sourceWl, sourceApp, sourceVer, a.GraphType)
 	destID, _ := graph.Id(destCluster, destSvcNs, destSvc, destWlNs, destWl, destApp, destVer, a.GraphType)
-	key := fmt.Sprintf("%s %s", sourceID, destID)
+	key := fmt.Sprintf("%s %s %s", sourceID, destID, protocol)
 
 	// For edges within the namespace we may get a responseTime reported from both the incoming and outgoing
 	// traffic queries.  We assume here the first reported value is preferred (i.e. defer to query order)

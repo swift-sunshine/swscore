@@ -47,6 +47,8 @@ func TestGetServiceMetrics(t *testing.T) {
 	api.MockRangeErrRounded("sum(rate(istio_requests_total{"+labels+`,response_code=~"^0$|^[4-5]\\d\\d$"}[5m])) OR sum(rate(istio_requests_total{`+labels+`,grpc_response_status=~"^[1-9]$|^1[0-6]$",response_code!~"^0$|^[4-5]\\d\\d$"}[5m]))`, 4.5)
 	api.MockRangeRounded("sum(rate(istio_request_bytes_sum{"+labels+"}[5m]))", 1000)
 	api.MockRangeRounded("sum(rate(istio_response_bytes_sum{"+labels+"}[5m]))", 1001)
+	api.MockRangeRounded("sum(rate(istio_request_messages_total{"+labels+"}[5m]))", 10)
+	api.MockRangeRounded("sum(rate(istio_response_messages_total{"+labels+"}[5m]))", 20)
 	api.MockRangeRounded("sum(rate(istio_tcp_received_bytes_total{"+labels+"}[5m]))", 11)
 	api.MockRangeRounded("sum(rate(istio_tcp_sent_bytes_total{"+labels+"}[5m]))", 13)
 	api.MockHistoRange("istio_request_bytes", "{"+labels+"}[5m]", 0.35, 0.2, 0.3, 0.7)
@@ -58,7 +60,11 @@ func TestGetServiceMetrics(t *testing.T) {
 	metrics, err := srv.GetMetrics(q, nil)
 
 	assert.Nil(err)
-	assert.Equal(9, len(metrics))
+	assert.Equal(11, len(metrics))
+	grpcRecIn := metrics["grpc_received"]
+	assert.NotNil(grpcRecIn)
+	grpcSentIn := metrics["grpc_sent"]
+	assert.NotNil(grpcSentIn)
 	rqCountIn := metrics["request_count"]
 	assert.NotNil(rqCountIn)
 	rqErrorCountIn := metrics["request_error_count"]
@@ -78,6 +84,8 @@ func TestGetServiceMetrics(t *testing.T) {
 	tcpSentIn := metrics["tcp_sent"]
 	assert.NotNil(tcpSentIn)
 
+	assert.Equal(20.0, float64(grpcRecIn[0].Datapoints[0].Value))
+	assert.Equal(10.0, float64(grpcSentIn[0].Datapoints[0].Value))
 	assert.Equal(2.5, float64(rqCountIn[0].Datapoints[0].Value))
 	assert.Equal(4.5, float64(rqErrorCountIn[0].Datapoints[0].Value))
 	assert.Equal(1000.0, float64(rqThroughput[0].Datapoints[0].Value))
@@ -121,6 +129,8 @@ func TestGetAppMetrics(t *testing.T) {
 	api.MockRangeErrRounded("sum(rate(istio_requests_total{"+labels+`,response_code=~"^0$|^[4-5]\\d\\d$"}[5m])) OR sum(rate(istio_requests_total{`+labels+`,grpc_response_status=~"^[1-9]$|^1[0-6]$",response_code!~"^0$|^[4-5]\\d\\d$"}[5m]))`, 3.5)
 	api.MockRangeRounded("sum(rate(istio_request_bytes_sum{"+labels+"}[5m]))", 1000)
 	api.MockRangeRounded("sum(rate(istio_response_bytes_sum{"+labels+"}[5m]))", 1001)
+	api.MockRangeRounded("sum(rate(istio_request_messages_total{"+labels+"}[5m]))", 10)
+	api.MockRangeRounded("sum(rate(istio_response_messages_total{"+labels+"}[5m]))", 20)
 	api.MockRangeRounded("sum(rate(istio_tcp_received_bytes_total{"+labels+"}[5m]))", 10)
 	api.MockRangeRounded("sum(rate(istio_tcp_sent_bytes_total{"+labels+"}[5m]))", 12)
 	api.MockHistoRange("istio_request_bytes", "{"+labels+"}[5m]", 0.35, 0.2, 0.3, 0.4)
@@ -138,7 +148,11 @@ func TestGetAppMetrics(t *testing.T) {
 	metrics, err := srv.GetMetrics(q, nil)
 
 	assert.Nil(err)
-	assert.Equal(9, len(metrics))
+	assert.Equal(11, len(metrics))
+	grpcRecIn := metrics["grpc_received"]
+	assert.NotNil(grpcRecIn)
+	grpcSentIn := metrics["grpc_sent"]
+	assert.NotNil(grpcSentIn)
 	rqCountIn := metrics["request_count"]
 	assert.NotNil(rqCountIn)
 	rqErrorCountIn := metrics["request_error_count"]
@@ -158,6 +172,8 @@ func TestGetAppMetrics(t *testing.T) {
 	tcpSentIn := metrics["tcp_sent"]
 	assert.NotNil(tcpSentIn)
 
+	assert.Equal(20.0, float64(grpcRecIn[0].Datapoints[0].Value))
+	assert.Equal(10.0, float64(grpcSentIn[0].Datapoints[0].Value))
 	assert.Equal(1.5, float64(rqCountIn[0].Datapoints[0].Value))
 	assert.Equal(3.5, float64(rqErrorCountIn[0].Datapoints[0].Value))
 	assert.Equal(1000.0, float64(rqThroughput[0].Datapoints[0].Value))
@@ -268,6 +284,8 @@ func TestGetNamespaceMetrics(t *testing.T) {
 	api.MockRangeErrRounded("sum(rate(istio_requests_total{"+labels+`,response_code=~"^0$|^[4-5]\\d\\d$"}[5m])) OR sum(rate(istio_requests_total{`+labels+`,grpc_response_status=~"^[1-9]$|^1[0-6]$",response_code!~"^0$|^[4-5]\\d\\d$"}[5m]))`, 3.5)
 	api.MockRangeRounded("sum(rate(istio_request_bytes_sum{"+labels+"}[5m]))", 1000)
 	api.MockRangeRounded("sum(rate(istio_response_bytes_sum{"+labels+"}[5m]))", 1001)
+	api.MockRangeRounded("sum(rate(istio_request_messages_total{"+labels+"}[5m]))", 10)
+	api.MockRangeRounded("sum(rate(istio_response_messages_total{"+labels+"}[5m]))", 20)
 	api.MockRangeRounded("sum(rate(istio_tcp_received_bytes_total{"+labels+"}[5m]))", 10)
 	api.MockRangeRounded("sum(rate(istio_tcp_sent_bytes_total{"+labels+"}[5m]))", 12)
 	api.MockHistoRange("istio_request_bytes", "{"+labels+"}[5m]", 0.35, 0.2, 0.3, 0.4)
@@ -284,7 +302,11 @@ func TestGetNamespaceMetrics(t *testing.T) {
 	metrics, err := srv.GetMetrics(q, nil)
 
 	assert.Nil(err)
-	assert.Equal(9, len(metrics))
+	assert.Equal(11, len(metrics))
+	grpcRecOut := metrics["grpc_received"]
+	assert.NotNil(grpcRecOut)
+	grpcSentOut := metrics["grpc_sent"]
+	assert.NotNil(grpcSentOut)
 	rqCountOut := metrics["request_count"]
 	assert.NotNil(rqCountOut)
 	rqErrorCountOut := metrics["request_error_count"]
@@ -304,6 +326,8 @@ func TestGetNamespaceMetrics(t *testing.T) {
 	tcpSentOut := metrics["tcp_sent"]
 	assert.NotNil(tcpSentOut)
 
+	assert.Equal(20.0, float64(grpcRecOut[0].Datapoints[0].Value))
+	assert.Equal(10.0, float64(grpcSentOut[0].Datapoints[0].Value))
 	assert.Equal(1.5, float64(rqCountOut[0].Datapoints[0].Value))
 	assert.Equal(3.5, float64(rqErrorCountOut[0].Datapoints[0].Value))
 	assert.Equal(1000.0, float64(rqThroughput[0].Datapoints[0].Value))

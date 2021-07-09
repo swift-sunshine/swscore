@@ -265,6 +265,36 @@ type QueryTimeParam struct {
 }
 
 // swagger:parameters graphApp graphAppVersion graphNamespaces graphService graphWorkload
+type RateGrpcParam struct {
+	// How to calculate gRPC traffic rate. One of: none | received (i.e. response_messages) | requests | sent (i.e. request_messages) | total (i.e. sent+received).
+	//
+	// in: query
+	// required: false
+	// default: requests
+	Name string `json:"rateGrpc"`
+}
+
+// swagger:parameters graphApp graphAppVersion graphNamespaces graphService graphWorkload
+type RateHttpParam struct {
+	// How to calculate HTTP traffic rate. One of: none | requests.
+	//
+	// in: query
+	// required: false
+	// default: requests
+	Name string `json:"rateHttp"`
+}
+
+// swagger:parameters graphApp graphAppVersion graphNamespaces graphService graphWorkload
+type RateTcpParam struct {
+	// How to calculate TCP traffic rate. One of: none | received (i.e. received_bytes) | sent (i.e. sent_bytes) | total (i.e. sent+received).
+	//
+	// in: query
+	// required: false
+	// default: sent
+	Name string `json:"rateTcp"`
+}
+
+// swagger:parameters graphApp graphAppVersion graphNamespaces graphService graphWorkload
 type ResponseTimeParam struct {
 	// Used only with responseTime appender. One of: avg | 50 | 95 | 99.
 	//

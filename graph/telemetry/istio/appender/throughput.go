@@ -28,6 +28,7 @@ type ThroughputAppender struct {
 	InjectServiceNodes bool
 	Namespaces         graph.NamespaceInfoMap
 	QueryTime          int64 // unix time in seconds
+	Rates              graph.RequestedRates
 	ThroughputType     string
 }
 
@@ -39,6 +40,11 @@ func (a ThroughputAppender) Name() string {
 // AppendGraph implements Appender
 func (a ThroughputAppender) AppendGraph(trafficMap graph.TrafficMap, globalInfo *graph.AppenderGlobalInfo, namespaceInfo *graph.AppenderNamespaceInfo) {
 	if len(trafficMap) == 0 {
+		return
+	}
+
+	// HTTP Throughput only apply to HTTP request traffic
+	if a.Rates.Http != graph.RateRequests {
 		return
 	}
 
@@ -94,7 +100,7 @@ func (a ThroughputAppender) appendGraph(trafficMap graph.TrafficMap, namespace s
 func applyThroughput(trafficMap graph.TrafficMap, throughputMap map[string]float64) {
 	for _, n := range trafficMap {
 		for _, e := range n.Edges {
-			key := fmt.Sprintf("%s %s", e.Source.ID, e.Dest.ID)
+			key := fmt.Sprintf("%s %s %s", e.Source.ID, e.Dest.ID, e.Metadata[graph.ProtocolKey].(string))
 			if val, ok := throughputMap[key]; ok {
 				e.Metadata[graph.Throughput] = val
 			}
@@ -171,7 +177,7 @@ func (a ThroughputAppender) populateThroughputMap(throughputMap map[string]float
 func (a ThroughputAppender) addThroughput(throughputMap map[string]float64, val float64, sourceCluster, sourceNs, sourceSvc, sourceWl, sourceApp, sourceVer, destCluster, destSvcNs, destSvc, destWlNs, destWl, destApp, destVer string) {
 	sourceID, _ := graph.Id(sourceCluster, sourceNs, sourceSvc, sourceNs, sourceWl, sourceApp, sourceVer, a.GraphType)
 	destID, _ := graph.Id(destCluster, destSvcNs, destSvc, destWlNs, destWl, destApp, destVer, a.GraphType)
-	key := fmt.Sprintf("%s %s", sourceID, destID)
+	key := fmt.Sprintf("%s %s http", sourceID, destID)
 
 	throughputMap[key] += val
 }

@@ -1,0 +1,238 @@
+{
+  "timestamp": 1523364075,
+  "duration": 600,
+  "graphType": "workload",
+  "elements": {
+    "nodes": [
+      {
+        "data": {
+          "id": "722acba99d3e761608c9797ae63494e4",
+          "nodeType": "workload",
+          "cluster": "unknown",
+          "namespace": "bankapp",
+          "workload": "deposit-v1",
+          "app": "deposit",
+          "version": "v1",
+          "destServices": [
+            {
+              "cluster": "unknown",
+              "namespace": "bankapp",
+              "name": "deposit"
+            }
+          ],
+          "traffic": [
+            {
+              "protocol": "grpc",
+              "rates": {
+                "grpcIn": "150.00"
+              }
+            }
+          ],
+          "isInaccessible": true,
+          "isOutside": true
+        }
+      },
+      {
+        "data": {
+          "id": "aa79c6b34228bebc55a417555ccc779e",
+          "nodeType": "workload",
+          "cluster": "unknown",
+          "namespace": "bookinfo",
+          "workload": "productpage-v1",
+          "app": "productpage",
+          "version": "v1",
+          "traffic": [
+            {
+              "protocol": "tcp",
+              "rates": {
+                "tcpOut": "93.00"
+              }
+            }
+          ],
+          "isRoot": true
+        }
+      },
+      {
+        "data": {
+          "id": "a31610f853c036d085df2b80c2f24615",
+          "nodeType": "workload",
+          "cluster": "unknown",
+          "namespace": "bookinfo",
+          "workload": "reviews-v3",
+          "app": "reviews",
+          "version": "v3",
+          "traffic": [
+            {
+              "protocol": "grpc",
+              "rates": {
+                "grpcOut": "150.00"
+              }
+            }
+          ],
+          "isRoot": true
+        }
+      },
+      {
+        "data": {
+          "id": "03533eaac2b4b0973ed07a0c2c7ef8d7",
+          "nodeType": "workload",
+          "cluster": "unknown",
+          "namespace": "bookinfo",
+          "workload": "tcp-v1",
+          "app": "tcp",
+          "version": "v1",
+          "destServices": [
+            {
+              "cluster": "unknown",
+              "namespace": "bookinfo",
+              "name": "tcp"
+            }
+          ],
+          "traffic": [
+            {
+              "protocol": "tcp",
+              "rates": {
+                "tcpIn": "1743.00"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "data": {
+          "id": "d5644516f2f70a6e887a3d366876c647",
+          "nodeType": "workload",
+          "cluster": "unknown",
+          "namespace": "istio-system",
+          "workload": "ingressgateway-unknown",
+          "app": "ingressgateway",
+          "version": "latest",
+          "traffic": [
+            {
+              "protocol": "tcp",
+              "rates": {
+                "tcpOut": "450.00"
+              }
+            }
+          ],
+          "isInaccessible": true,
+          "isOutside": true,
+          "isRoot": true
+        }
+      },
+      {
+        "data": {
+          "id": "375ab940b56ae7bcf0f89cb1a7af5d44",
+          "nodeType": "unknown",
+          "cluster": "unknown",
+          "namespace": "unknown",
+          "workload": "unknown",
+          "app": "unknown",
+          "version": "unknown",
+          "traffic": [
+            {
+              "protocol": "tcp",
+              "rates": {
+                "tcpOut": "1200.00"
+              }
+            }
+          ],
+          "isInaccessible": true,
+          "isRoot": true
+        }
+      }
+    ],
+    "edges": [
+      {
+        "data": {
+          "id": "55798fbf115d0652891f91961c34dbad",
+          "source": "375ab940b56ae7bcf0f89cb1a7af5d44",
+          "target": "03533eaac2b4b0973ed07a0c2c7ef8d7",
+          "traffic": {
+            "protocol": "tcp",
+            "rates": {
+              "tcp": "1200.00"
+            },
+            "responses": {
+              "-": {
+                "flags": {
+                  "-": "100.0"
+                },
+                "hosts": {
+                  "tcp:9080": "100.0"
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "data": {
+          "id": "230f85dfbf8a828cfcd5379a49876de7",
+          "source": "a31610f853c036d085df2b80c2f24615",
+          "target": "722acba99d3e761608c9797ae63494e4",
+          "traffic": {
+            "protocol": "grpc",
+            "rates": {
+              "grpc": "150.00",
+              "grpcPercentReq": "100.0"
+            },
+            "responses": {
+              "-": {
+                "hosts": {
+                  "deposit:9080": "100.0"
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "data": {
+          "id": "5686985336f05006df3ae891e7ff84d0",
+          "source": "aa79c6b34228bebc55a417555ccc779e",
+          "target": "03533eaac2b4b0973ed07a0c2c7ef8d7",
+          "traffic": {
+            "protocol": "tcp",
+            "rates": {
+              "tcp": "93.00"
+            },
+            "responses": {
+              "-": {
+                "flags": {
+                  "-": "100.0"
+                },
+                "hosts": {
+                  "tcp:9080": "100.0"
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "data": {
+          "id": "ddc66fe0aacf6094ae85a13ab442f973",
+          "source": "d5644516f2f70a6e887a3d366876c647",
+          "target": "03533eaac2b4b0973ed07a0c2c7ef8d7",
+          "traffic": {
+            "protocol": "tcp",
+            "rates": {
+              "tcp": "450.00"
+            },
+            "responses": {
+              "-": {
+                "flags": {
+                  "-": "100.0"
+                },
+                "hosts": {
+                  "tcp:9080": "100.0"
+                }
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+}
