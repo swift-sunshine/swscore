@@ -1,6 +1,7 @@
 package httputil
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,88 +10,88 @@ import (
 func TestGetFreePort(t *testing.T) {
 	assert := assert.New(t)
 
-	ResetPool()
+	testPool := newPool(14100, 100)
 
-	port := GetFreePort()
+	port := testPool.GetFreePort()
 	assert.Equal(14100, port)
 
-	port = GetFreePort()
+	port = testPool.GetFreePort()
 	assert.Equal(14101, port)
 
-	port = GetFreePort()
+	port = testPool.GetFreePort()
 	assert.Equal(14102, port)
 }
 
 func TestGetFreePort_NoPortsAvailable(t *testing.T) {
 	assert := assert.New(t)
 
-	ResetPool()
+	testPool := newPool(14100, 100)
 
 	for i := 0; i < 100; i++ {
-		port := GetFreePort()
+		port := testPool.GetFreePort()
 		assert.Equal(14100+i, port)
 	}
 
-	port := GetFreePort()
+	port := testPool.GetFreePort()
 	assert.Equal(0, port)
 
-	port = GetFreePort()
+	port = testPool.GetFreePort()
 	assert.Equal(0, port)
 }
 
 func TestFreePort(t *testing.T) {
 	assert := assert.New(t)
 
-	ResetPool()
+	testPool := newPool(14100, 100)
 
-	for i := 0; i < portRangeSize; i++ {
-		port := GetFreePort()
-		assert.Equal(portRangeInit+i, port)
+	for i := 0; i < testPool.PortRangeSize; i++ {
+		port := testPool.GetFreePort()
+		assert.Equal(testPool.PortRangeInit+i, port)
 	}
 
 	// No free port available (out of range)
-	port := GetFreePort()
+	port := testPool.GetFreePort()
 	assert.Equal(0, port)
 
 	// Once you free one port, this is
-	err := FreePort(14104)
-	port = GetFreePort()
+	err := testPool.FreePort(14104)
+	port = testPool.GetFreePort()
 	assert.NoError(err)
 	assert.Equal(14104, port)
 
-	port = GetFreePort()
+	port = testPool.GetFreePort()
 	assert.NoError(err)
 	assert.Equal(0, port)
 
-	err = FreePort(14104)
-	port = GetFreePort()
+	err = testPool.FreePort(14104)
+	port = testPool.GetFreePort()
 	assert.NoError(err)
 	assert.Equal(14104, port)
 
-	err = FreePort(14199)
-	port = GetFreePort()
+	err = testPool.FreePort(14199)
+	port = testPool.GetFreePort()
 	assert.NoError(err)
 	assert.Equal(14199, port)
 
-	err = FreePort(14100)
-	port = GetFreePort()
+	err = testPool.FreePort(14100)
+	port = testPool.GetFreePort()
 	assert.NoError(err)
 	assert.Equal(14100, port)
 }
 
 func TestFreePort_OutOfRange(t *testing.T) {
-	err := FreePort(8080)
+	testPool := newPool(14100, 100)
+
+	err := testPool.FreePort(8080)
 	assert.Errorf(t, err, "Port %d is out of range", 8080)
 }
 
-func TestResetPortPool(t *testing.T) {
-	ResetPool()
-
-	port := GetFreePort()
-	assert.Equal(t, 14100, port)
-
-	ResetPool()
-
-	port = GetFreePort()
-	assert.Equal(t, 14100, port)
+func newPool(rangeInit, rangeSize int) PortPool {
+	return PortPool{
+		LastBusyPort:  rangeInit - 1,
+		Mutex:         sync.Mutex{},
+		PortsMap:      map[int]bool{},
+		PortRangeInit: rangeInit,
+		PortRangeSize: rangeSize,
+	}
 }

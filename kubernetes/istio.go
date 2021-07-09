@@ -216,7 +216,7 @@ func (in *K8SClient) getIstiodDebugStatus(debugPath string) (map[string][]byte, 
 	// Using the port-forwarding, the call is made as it was in the pod itself, as a localhost call.
 	// Also the port-forwarding to a pod is done via the KubeAPI. Therefore if the call doesn't return any error,
 	// it means that Kiali has access to the KubeAPI and that the KubeAPI has access to the Istiod (control plane).
-	_, err = in.ForwardGetRequest(c.IstioNamespace, istiods[0].Name, httputil.GetFreePort(), 8080, "/ready")
+	_, err = in.ForwardGetRequest(c.IstioNamespace, istiods[0].Name, httputil.Pool.GetFreePort(), 8080, "/ready")
 	if err != nil {
 		return nil, fmt.Errorf("unable to proxy Istiod pods. " +
 			"Make sure your Kubernetes API server has access to the Istio control plane through 8080 port")
@@ -235,7 +235,7 @@ func (in *K8SClient) getIstiodDebugStatus(debugPath string) (map[string][]byte, 
 			// The 15014 port on Istiod is open for control plane monitoring.
 			// Here's the Istio doc page about the port usage by istio:
 			// https://istio.io/latest/docs/ops/deployment/requirements/#ports-used-by-istio
-			res, err := in.ForwardGetRequest(namespace, name, httputil.GetFreePort(), 15014, debugPath)
+			res, err := in.ForwardGetRequest(namespace, name, httputil.Pool.GetFreePort(), 15014, debugPath)
 			if err != nil {
 				errChan <- fmt.Errorf("%s: %s", name, err.Error())
 			} else {
@@ -322,7 +322,7 @@ func parseRegistryServices(registries map[string][]byte) ([]*RegistryStatus, err
 
 func (in *K8SClient) GetConfigDump(namespace, podName string) (*ConfigDump, error) {
 	// Fetching the config_dump data, raw.
-	resp, err := in.ForwardGetRequest(namespace, podName, httputil.GetFreePort(), 15000, "/config_dump")
+	resp, err := in.ForwardGetRequest(namespace, podName, httputil.Pool.GetFreePort(), 15000, "/config_dump")
 	if err != nil {
 		log.Errorf("Error forwarding the /config_dump request: %v", err)
 		return nil, err
