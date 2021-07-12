@@ -7,6 +7,16 @@ import time
 from utils.common_utils import common_utils
 
 gmt = time.gmtime
+INVALID_PATH_NAMESPACE_WORKLOAD = {'namespace': 'invalid', 'workload':'details-v1'}
+INVALID_PATH_WORKLOAD_WORKLOAD = {'namespace': 'bookinfo', 'workload':'invalid'}
+INVALID_PATH_WORKLOAD = {'namespace': 'invalid', 'workload':'invalid'}
+INVALID_PATH_NAMESPACE_SERVICE = {'namespace': 'invalid', 'service':'details'}
+INVALID_PATH_SERVICE_SERVICE = {'namespace': 'bookinfo', 'service':'invalid'}
+INVALID_PATH_SERVICE = {'namespace': 'invalid', 'service':'invalid'}
+INVALID_PARAMS_STARTMICROS = {'startMicros': 'invalid' }
+INVALID_PATH_NAMESPACE_APP = {'namespace': 'invalid', 'app':'details'}
+INVALID_PATH_APP_APP = {'namespace': 'bookinfo', 'app':'invalid'}
+INVALID_PATH_APP = {'namespace': 'invalid', 'app':'invalid'}
 
 @pytest.fixture(scope="session", autouse=True)
 def before_all_tests(kiali_client):
@@ -380,3 +390,63 @@ def test_negative_500(kiali_client):
     INVALID_PARAMS_SERVICEDETAILS = {'namespace': 'invalid', 'service': 'kiali'}
 
     common_utils.get_response(kiali_client, method_name='serviceDetails', path=INVALID_PARAMS_SERVICEDETAILS, status_code_expected=500)
+
+def test_invalid_workload_traces_list_negative_503(kiali_client):
+     
+ 	common_utils.get_response(kiali_client, method_name='workloadTraces', path=INVALID_PATH_NAMESPACE_WORKLOAD, params={'startMicros': calendar.timegm(gmt()) }, status_code_expected=503)
+ 	common_utils.get_response(kiali_client, method_name='workloadTraces', path=INVALID_PATH_WORKLOAD_WORKLOAD, params={'startMicros': calendar.timegm(gmt()) }, status_code_expected=503)
+ 	common_utils.get_response(kiali_client, method_name='workloadTraces', path=INVALID_PATH_WORKLOAD, params={'startMicros': calendar.timegm(gmt()) }, status_code_expected=503)
+
+def test_invalid_workload_traces_list_negative_400(kiali_client):
+    
+	common_utils.get_response(kiali_client, method_name='workloadTraces', path={'namespace': 'bookinfo', 'workload':'details-v1'}, params=INVALID_PARAMS_STARTMICROS, status_code_expected=400)
+	common_utils.get_response(kiali_client, method_name='workloadTraces', path=INVALID_PATH_WORKLOAD_WORKLOAD, params=INVALID_PARAMS_STARTMICROS, status_code_expected=400)
+	common_utils.get_response(kiali_client, method_name='workloadTraces', path=INVALID_PATH_NAMESPACE_WORKLOAD, params=INVALID_PARAMS_STARTMICROS, status_code_expected=400)
+	common_utils.get_response(kiali_client, method_name='workloadTraces', path=INVALID_PATH_WORKLOAD, params=INVALID_PARAMS_STARTMICROS, status_code_expected=400)
+
+def test_invalid_workload_spans_list_negative_400(kiali_client):
+    
+    common_utils.get_response(kiali_client, method_name='workloadSpans', path={'namespace': 'bookinfo', 'workload':'details-v1'}, params=INVALID_PARAMS_STARTMICROS, status_code_expected=400)
+    common_utils.get_response(kiali_client, method_name='workloadSpans', path=INVALID_PATH_WORKLOAD_WORKLOAD, params=INVALID_PARAMS_STARTMICROS, status_code_expected=400)
+    common_utils.get_response(kiali_client, method_name='workloadSpans', path=INVALID_PATH_NAMESPACE_WORKLOAD, params=INVALID_PARAMS_STARTMICROS, status_code_expected=400)
+    common_utils.get_response(kiali_client, method_name='workloadSpans', path=INVALID_PATH_WORKLOAD, params=INVALID_PARAMS_STARTMICROS, status_code_expected=400)
+
+def test_invalid_workload_spans_list_negative_503(kiali_client):
+   	
+    common_utils.get_response(kiali_client, method_name='workloadSpans', path=INVALID_PATH_NAMESPACE_WORKLOAD, params={'startMicros': calendar.timegm(gmt()) }, status_code_expected=503)
+    common_utils.get_response(kiali_client, method_name='workloadSpans', path=INVALID_PATH_WORKLOAD_WORKLOAD, params={'startMicros': calendar.timegm(gmt()) }, status_code_expected=503)
+    common_utils.get_response(kiali_client, method_name='workloadSpans', path=INVALID_PATH_WORKLOAD, params={'startMicros': calendar.timegm(gmt()) }, status_code_expected=503)
+
+def test_invalid_service_traces_list_negative_503(kiali_client):
+     
+    common_utils.get_response(kiali_client, method_name='serviceTraces', path=INVALID_PATH_NAMESPACE_SERVICE, params={'startMicros': calendar.timegm(gmt()) }, status_code_expected=503)
+    common_utils.get_response(kiali_client, method_name='serviceTraces', path=INVALID_PATH_SERVICE_SERVICE, params={'startMicros': calendar.timegm(gmt()) }, status_code_expected=503)
+    common_utils.get_response(kiali_client, method_name='serviceTraces', path=INVALID_PATH_SERVICE, params={'startMicros': calendar.timegm(gmt()) }, status_code_expected=503)
+
+def test_invalid_service_traces_list_negative_400(kiali_client):
+    
+	common_utils.get_response(kiali_client, method_name='serviceTraces', path={'namespace': 'bookinfo', 'service':'details'}, params=INVALID_PARAMS_STARTMICROS, status_code_expected=400)
+	common_utils.get_response(kiali_client, method_name='serviceTraces', path=INVALID_PATH_SERVICE_SERVICE, params=INVALID_PARAMS_STARTMICROS, status_code_expected=400)
+	common_utils.get_response(kiali_client, method_name='serviceTraces', path=INVALID_PATH_NAMESPACE_SERVICE, params=INVALID_PARAMS_STARTMICROS, status_code_expected=400)
+	common_utils.get_response(kiali_client, method_name='serviceTraces', path=INVALID_PATH_SERVICE, params=INVALID_PARAMS_STARTMICROS, status_code_expected=400)
+
+def test_invalid_service_spans_list_negative_503(kiali_client):
+   	
+    common_utils.get_response(kiali_client, method_name='serviceSpans', path=INVALID_PATH_NAMESPACE_SERVICE, params={'startMicros': calendar.timegm(gmt()) }, status_code_expected=503)
+    common_utils.get_response(kiali_client, method_name='serviceSpans', path=INVALID_PATH_SERVICE_SERVICE, params={'startMicros': calendar.timegm(gmt()) }, status_code_expected=503)
+    common_utils.get_response(kiali_client, method_name='serviceSpans', path=INVALID_PATH_SERVICE, params={'startMicros': calendar.timegm(gmt()) }, status_code_expected=503)
+
+
+def test_invalid_app_spans_list_negative_400(kiali_client):
+    
+    common_utils.get_response(kiali_client, method_name='appSpans', path={'namespace': 'bookinfo', 'app':'details'}, params=INVALID_PARAMS_STARTMICROS, status_code_expected=400)
+    common_utils.get_response(kiali_client, method_name='appSpans', path=INVALID_PATH_APP_APP, params=INVALID_PARAMS_STARTMICROS, status_code_expected=400)
+    common_utils.get_response(kiali_client, method_name='appSpans', path=INVALID_PATH_NAMESPACE_APP, params=INVALID_PARAMS_STARTMICROS, status_code_expected=400)
+    common_utils.get_response(kiali_client, method_name='appSpans', path=INVALID_PATH_APP, params=INVALID_PARAMS_STARTMICROS, status_code_expected=400)
+
+def test_invalid_app_trace_list_negative_400(kiali_client):
+    
+    common_utils.get_response(kiali_client, method_name='appTraces', path={'namespace': 'bookinfo', 'app':'details'}, params=INVALID_PARAMS_STARTMICROS, status_code_expected=400)
+    common_utils.get_response(kiali_client, method_name='appTraces', path=INVALID_PATH_APP_APP, params=INVALID_PARAMS_STARTMICROS, status_code_expected=400)
+    common_utils.get_response(kiali_client, method_name='appTraces', path=INVALID_PATH_NAMESPACE_APP, params=INVALID_PARAMS_STARTMICROS, status_code_expected=400)
+    common_utils.get_response(kiali_client, method_name='appTraces', path=INVALID_PATH_APP, params=INVALID_PARAMS_STARTMICROS, status_code_expected=400)
