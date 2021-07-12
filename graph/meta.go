@@ -17,6 +17,7 @@ const (
 	AggregateValue        MetadataKey = "aggregateValue"
 	DestPrincipal         MetadataKey = "destPrincipal"
 	DestServices          MetadataKey = "destServices"
+	Gateways              MetadataKey = "gateways"
 	HasCB                 MetadataKey = "hasCB"
 	HasFaultInjection     MetadataKey = "hasFaultInjection"
 	HasHealthConfig       MetadataKey = "hasHealthConfig"
@@ -27,7 +28,8 @@ const (
 	HasRequestTimeout     MetadataKey = "hasRequestTimeout"
 	HasVS                 MetadataKey = "hasVS"
 	IsDead                MetadataKey = "isDead"
-	IsEgressCluster       MetadataKey = "isEgressCluster" // PassthroughCluster or BlackHoleCluster
+	IsEgressCluster       MetadataKey = "isEgressCluster"  // PassthroughCluster or BlackHoleCluster
+	IsIngressGw           MetadataKey = "isIngressGateway" // Identifies a node that is an Istio ingress gateway
 	IsIdle                MetadataKey = "isIdle"
 	IsInaccessible        MetadataKey = "isInaccessible"
 	IsMTLS                MetadataKey = "isMTLS"
@@ -38,6 +40,7 @@ const (
 	ResponseTime          MetadataKey = "responseTime"
 	SourcePrincipal       MetadataKey = "sourcePrincipal"
 	Throughput            MetadataKey = "throughput"
+	VirtualServices       MetadataKey = "virtualServices"
 )
 
 // DestServicesMetadata key=Service.Key()
@@ -53,3 +56,6 @@ func (dsm DestServicesMetadata) Add(key string, service ServiceName) DestService
 	dsm[key] = service
 	return dsm
 }
+
+type GatewaysMetadata map[string][]string
+type VirtualServicesMetadata map[string][]string

@@ -4588,6 +4588,31 @@
       "title": "FieldsV1 stores a set of fields in a data structure like a Trie, in JSON format.",
       "x-go-package": "k8s.io/apimachinery/pkg/apis/meta/v1"
     },
+    "GWInfo": {
+      "description": "GWInfo contains the resolved gateway configuration if the node represents an Istio gateway",
+      "type": "object",
+      "properties": {
+        "ingressInfo": {
+          "$ref": "#/definitions/GWInfoIngress"
+        }
+      },
+      "x-go-package": "github.com/kiali/kiali/graph/config/cytoscape"
+    },
+    "GWInfoIngress": {
+      "description": "GWInfoIngress contains the resolved gateway configuration if the node represents an Istio ingress gateway",
+      "type": "object",
+      "properties": {
+        "hostnames": {
+          "description": "Hostnames is the list of hosts being served by the associated Istio gateways.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-name": "Hostnames"
+        }
+      },
+      "x-go-package": "github.com/kiali/kiali/graph/config/cytoscape"
+    },
     "Gateway": {
       "type": "object",
       "properties": {
@@ -4609,6 +4634,9 @@
           "properties": {
             "selector": {
               "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
               "x-go-name": "Selector"
             },
             "servers": {
@@ -5864,6 +5892,9 @@
         "isDead": {
           "type": "boolean",
           "x-go-name": "IsDead"
+        },
+        "isGateway": {
+          "$ref": "#/definitions/GWInfo"
         },
         "isIdle": {
           "type": "boolean",

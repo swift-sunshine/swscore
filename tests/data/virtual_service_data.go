@@ -7,6 +7,11 @@ import (
 )
 
 func CreateEmptyVirtualService(name string, namespace string, hosts []string) kubernetes.IstioObject {
+	hostsAsInterface := make([]interface{}, len(hosts))
+	for i, h := range hosts {
+		hostsAsInterface[i] = h
+	}
+
 	return (&kubernetes.GenericIstioObject{
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name:        name,
@@ -14,7 +19,7 @@ func CreateEmptyVirtualService(name string, namespace string, hosts []string) ku
 			ClusterName: "svc.cluster.local",
 		},
 		Spec: map[string]interface{}{
-			"hosts": hosts,
+			"hosts": hostsAsInterface,
 		},
 	}).DeepCopyIstioObject()
 }

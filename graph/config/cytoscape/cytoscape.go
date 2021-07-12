@@ -54,6 +54,27 @@ type ProtocolTraffic struct {
 	Responses Responses         `json:"responses,omitempty"` // see comment above
 }
 
+// GWInfo contains the resolved gateway configuration if the node represents an Istio gateway
+type GWInfo struct {
+	// IngressInfo contains the resolved gateway configuration if the node represents an Istio ingress gateway
+	IngressInfo GWInfoIngress `json:"ingressInfo,omitempty"`
+	//EgressInfo struct {
+	//
+	//}
+}
+
+// GWInfoIngress contains the resolved gateway configuration if the node represents an Istio ingress gateway
+type GWInfoIngress struct {
+	// Hostnames is the list of hosts being served by the associated Istio gateways.
+	Hostnames []string `json:"hostnames,omitempty"`
+}
+
+// VSInfo contains the resolved VS configuration if the node has a VS attached.
+type VSInfo struct {
+	// Hostnames is the list of hostnames configured in the associated VSs
+	Hostnames []string `json:"hostnames,omitempty"`
+}
+
 // HealthConfig maps annotations information for health
 type HealthConfig map[string]string
 
@@ -81,9 +102,10 @@ type NodeData struct {
 	HasRequestTimeout     bool                `json:"hasRequestTimeout,omitempty"`     // true (vs has request timeout) | false
 	HasTCPTrafficShifting bool                `json:"hasTCPTrafficShifting,omitempty"` // true (vs has tcp traffic shifting) | false
 	HasTrafficShifting    bool                `json:"hasTrafficShifting,omitempty"`    // true (vs has traffic shifting) | false
-	HasVS                 bool                `json:"hasVS,omitempty"`                 // true (has route rule) | false
+	HasVS                 *VSInfo             `json:"hasVS,omitempty"`                 // it can be empty if there is a VS without hostnames
 	IsBox                 string              `json:"isBox,omitempty"`                 // set for NodeTypeBox, current values: [ 'app', 'cluster', 'namespace' ]
 	IsDead                bool                `json:"isDead,omitempty"`                // true (has no pods) | false
+	IsGateway             *GWInfo             `json:"isGateway,omitempty"`             // Istio ingress/egress gateway information
 	IsIdle                bool                `json:"isIdle,omitempty"`                // true | false
 	IsInaccessible        bool                `json:"isInaccessible,omitempty"`        // true if the node exists in an inaccessible namespace
 	IsOutside             bool                `json:"isOutside,omitempty"`             // true | false
@@ -248,14 +270,37 @@ func buildConfig(trafficMap graph.TrafficMap, nodes *[]*NodeWrapper, edges *[]*E
 			nd.IsInaccessible = val.(bool)
 		}
 
+		// node may represent an Istio Ingress Gateway
+		if val, ok := n.Metadata[graph.IsIngressGw]; ok && val.(bool) {
+			var configuredHostnames []string
+			if gwData, gwOk := n.Metadata[graph.Gateways]; gwOk {
+				for _, hosts := range gwData.(graph.GatewaysMetadata) {
+					configuredHostnames = append(configuredHostnames, hosts...)
+				}
+			}
+
+			nd.IsGateway = &GWInfo{
+				IngressInfo: GWInfoIngress{Hostnames: configuredHostnames},
+			}
+		}
+
 		// node may have a circuit breaker
 		if val, ok := n.Metadata[graph.HasCB]; ok {
 			nd.HasCB = val.(bool)
 		}
 
 		// node may have a virtual service
-		if val, ok := n.Metadata[graph.HasVS]; ok {
-			nd.HasVS = val.(bool)
+		if val, ok := n.Metadata[graph.HasVS]; ok && val.(bool) {
+			nd.HasVS = &VSInfo{}
+
+			var configuredHostnames []string
+			if vsData, vsOk := n.Metadata[graph.VirtualServices]; vsOk {
+				for _, hosts := range vsData.(graph.VirtualServicesMetadata) {
+					configuredHostnames = append(configuredHostnames, hosts...)
+				}
+			}
+
+			nd.HasVS.Hostnames = configuredHostnames
 		}
 
 		// set sidecars checks, if available

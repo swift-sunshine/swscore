@@ -24,7 +24,7 @@ type VirtualServices struct {
 type VirtualService struct {
 	IstioBase
 	Spec struct {
-		Hosts    interface{} `json:"hosts,omitempty"`
+		Hosts    []string    `json:"hosts,omitempty"`
 		Gateways interface{} `json:"gateways,omitempty"`
 		Http     interface{} `json:"http,omitempty"`
 		Tcp      interface{} `json:"tcp,omitempty"`
@@ -44,12 +44,20 @@ func (vServices *VirtualServices) Parse(virtualServices []kubernetes.IstioObject
 
 func (vService *VirtualService) Parse(virtualService kubernetes.IstioObject) {
 	vService.IstioBase.Parse(virtualService)
-	vService.Spec.Hosts = virtualService.GetSpec()["hosts"]
 	vService.Spec.Gateways = virtualService.GetSpec()["gateways"]
 	vService.Spec.Http = virtualService.GetSpec()["http"]
 	vService.Spec.Tls = virtualService.GetSpec()["tls"]
 	vService.Spec.Tcp = virtualService.GetSpec()["tcp"]
 	vService.Spec.ExportTo = virtualService.GetSpec()["exportTo"]
+
+	if virtualService.GetSpec()["hosts"] != nil {
+		hosts := virtualService.GetSpec()["hosts"].([]interface{})
+		parsedHosts := make([]string, 0, len(hosts))
+		for _, host := range virtualService.GetSpec()["hosts"].([]interface{}) {
+			parsedHosts = append(parsedHosts, host.(string))
+		}
+		vService.Spec.Hosts = parsedHosts
+	}
 }
 
 // IsValidHost returns true if VirtualService hosts applies to the service
