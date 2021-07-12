@@ -180,6 +180,11 @@ func (in *AppService) GetAppList(namespace string, linkIstioResources bool) (mod
 // GetApp is the API handler to fetch the details for a given namespace and app name
 func (in *AppService) GetApp(namespace string, appName string) (models.App, error) {
 	appInstance := &models.App{Namespace: models.Namespace{Name: namespace}, Name: appName}
+	ns, err := in.businessLayer.Namespace.GetNamespace(namespace)
+	if err != nil {
+		return *appInstance, err
+	}
+	appInstance.Namespace = *ns
 	namespaceApps, err := fetchNamespaceApps(in.businessLayer, namespace, appName)
 	if err != nil {
 		return *appInstance, err
@@ -208,7 +213,7 @@ func (in *AppService) GetApp(namespace string, appName string) (models.App, erro
 	for _, workload := range appDetails.Workloads {
 		pods = append(pods, workload.Pods...)
 	}
-	(*appInstance).Runtimes = NewDashboardsService().GetCustomDashboardRefs(namespace, appName, "", pods)
+	(*appInstance).Runtimes = NewDashboardsService(ns, nil).GetCustomDashboardRefs(namespace, appName, "", pods)
 
 	return *appInstance, nil
 }

@@ -7900,6 +7900,7 @@ This type is used to describe a set of objects.
 
 | Name | Type | Go type | Required | Default | Description | Example |
 |------|------|---------|:--------:| ------- |-------------|---------|
+| Annotations | map of string| `map[string]string` |  | | Specific annotations used in Kiali |  |
 | Labels | map of string| `map[string]string` |  | | Labels for Namespace |  |
 | Name | string| `string` | ✓ | | The id of the namespace. | `istio-system` |
 
@@ -9140,6 +9141,7 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 | AvailableReplicas | int32 (formatted integer)| `int32` | ✓ | | Number of available replicas | `1` |
 | CreatedAt | string| `string` | ✓ | | Creation timestamp (in RFC3339 format) | `2018-07-31T12:24:17Z` |
 | CurrentReplicas | int32 (formatted integer)| `int32` | ✓ | | Number of current replicas pods that matches controller selector labels | `2` |
+| DashboardAnnotations | map of string| `map[string]string` |  | | Dashboard annotations |  |
 | DesiredReplicas | int32 (formatted integer)| `int32` | ✓ | | Number of desired replicas defined by the user in the controller Spec | `2` |
 | HealthAnnotations | map of string| `map[string]string` |  | | HealthAnnotations |  |
 | IstioInjectionAnnotation | boolean| `bool` |  | | Define if Workload has an explicit Istio policy annotation
@@ -9351,6 +9353,7 @@ https://istio.io/latest/docs/reference/config/networking/workload-group/#Workloa
 |------|------|---------|:--------:| ------- |-------------|---------|
 | AppLabel | boolean| `bool` | ✓ | | Define if Pods related to this Workload has the label App | `true` |
 | CreatedAt | string| `string` | ✓ | | Creation timestamp (in RFC3339 format) | `2018-07-31T12:24:17Z` |
+| DashboardAnnotations | map of string| `map[string]string` |  | | Dashboard annotations |  |
 | HealthAnnotations | map of string| `map[string]string` |  | | HealthAnnotations |  |
 | IstioInjectionAnnotation | boolean| `bool` |  | | Define if Workload has an explicit Istio policy annotation
 It's mapped as a pointer to show three values nil, true, false |  |

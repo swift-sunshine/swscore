@@ -10,6 +10,8 @@ import (
 )
 
 const (
+	// DashboardTemplateAnnotation is the key name of the namespace annotation for dashboard templates
+	DashboardTemplateAnnotation string = "dashboards.kiali.io/templates"
 	// Raw constant for DataType
 	Raw = "raw"
 	// Rate constant for DataType
@@ -126,6 +128,32 @@ func GetBuiltInMonitoringDashboards() MonitoringDashboardsList {
 		empty := make([]MonitoringDashboard, 0)
 		return MonitoringDashboardsList(empty)
 	}
+}
+
+// GetNamespaceMonitoringDashboards will examine the given namespace annotations and return any dashboard yaml found.
+func GetNamespaceMonitoringDashboards(namespace string, annotations map[string]string) MonitoringDashboardsList {
+	if dashboardYaml, ok := annotations[DashboardTemplateAnnotation]; ok {
+		if v, err := unmarshal(dashboardYaml); err == nil {
+			return MonitoringDashboardsList(v)
+		} else {
+			log.Errorf("Failed to unmarshall yaml dashboard in namespace %s. err=%v", namespace, err)
+		}
+	}
+	empty := make([]MonitoringDashboard, 0)
+	return MonitoringDashboardsList(empty)
+}
+
+// GetWorkloadMonitoringDashboards will examine the given namespace annotations and return any dashboard yaml found.
+func GetWorkloadMonitoringDashboards(namespace string, workload string, annotations map[string]string) MonitoringDashboardsList {
+	if dashboardYaml, ok := annotations[DashboardTemplateAnnotation]; ok {
+		if v, err := unmarshal(dashboardYaml); err == nil {
+			return MonitoringDashboardsList(v)
+		} else {
+			log.Errorf("Failed to unmarshall yaml dashboard in namespace %s and workload %s. err=%v", namespace, workload, err)
+		}
+	}
+	empty := make([]MonitoringDashboard, 0)
+	return MonitoringDashboardsList(empty)
 }
 
 // OrganizeByName returns a map with the key being the names of the dashboards; values are the dashboards themselves

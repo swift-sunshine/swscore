@@ -7060,6 +7060,14 @@
           "x-go-name": "CurrentReplicas",
           "example": 2
         },
+        "dashboardAnnotations": {
+          "description": "Dashboard annotations",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "x-go-name": "DashboardAnnotations"
+        },
         "desiredReplicas": {
           "description": "Number of desired replicas defined by the user in the controller Spec",
           "type": "integer",
@@ -7234,6 +7242,14 @@
           "type": "string",
           "x-go-name": "CreatedAt",
           "example": "2018-07-31T12:24:17Z"
+        },
+        "dashboardAnnotations": {
+          "description": "Dashboard annotations",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "x-go-name": "DashboardAnnotations"
         },
         "healthAnnotations": {
           "description": "HealthAnnotations",
@@ -7559,6 +7575,14 @@
         "name"
       ],
       "properties": {
+        "annotations": {
+          "description": "Specific annotations used in Kiali",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "x-go-name": "Annotations"
+        },
         "labels": {
           "description": "Labels for Namespace",
           "type": "object",

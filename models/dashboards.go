@@ -15,6 +15,8 @@ type DashboardQuery struct {
 	LabelsFilters     map[string]string
 	AdditionalLabels  []Aggregation
 	RawDataAggregator string
+	Workload          string
+	WorkloadType      string
 }
 
 // FillDefaults fills the struct with default parameters
@@ -155,4 +157,13 @@ func PrepareIstioDashboard(direction, local, remote string) MonitoringDashboard 
 		Aggregations: buildIstioAggregations(local, remote),
 		Charts:       []Chart{},
 	}
+}
+
+func GetDashboardAnnotation(annotations map[string]string) map[string]string {
+	filtered := make(map[string]string)
+	// Parse only annotations used by Kiali
+	if da, ok := annotations[dashboards.DashboardTemplateAnnotation]; ok {
+		filtered[dashboards.DashboardTemplateAnnotation] = da
+	}
+	return filtered
 }

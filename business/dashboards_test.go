@@ -12,14 +12,15 @@ import (
 	pmock "github.com/kiali/kiali/prometheus/prometheustest"
 )
 
-func setupService(dashboards []dashboards.MonitoringDashboard) (*DashboardsService, *pmock.PromClientMock) {
+func setupService(namespace string, dashboards []dashboards.MonitoringDashboard) (*DashboardsService, *pmock.PromClientMock) {
 	cfg := config.NewConfig()
 	for _, d := range dashboards {
 		cfg.CustomDashboards = append(cfg.CustomDashboards, d)
 	}
 	config.Set(cfg)
 	prom := new(pmock.PromClientMock)
-	service := NewDashboardsService()
+	ns := models.Namespace{Name: namespace}
+	service := NewDashboardsService(&ns, nil)
 	service.promClient = prom
 	return service, prom
 }
@@ -28,11 +29,14 @@ func TestGetDashboard(t *testing.T) {
 	assert := assert.New(t)
 
 	// Setup mocks
-	service, prom := setupService([]dashboards.MonitoringDashboard{*fakeDashboard("1")})
+	service, prom := setupService("my-namespace", []dashboards.MonitoringDashboard{*fakeDashboard("1")})
 
 	expectedLabels := "{kubernetes_namespace=\"my-namespace\",APP=\"my-app\"}"
+	namespace := models.Namespace{
+		Name: "my-namespace",
+	}
 	query := models.DashboardQuery{
-		Namespace: "my-namespace",
+		Namespace: namespace.Name,
 		LabelsFilters: map[string]string{
 			"APP": "my-app",
 		},
@@ -67,11 +71,14 @@ func TestGetDashboardFromKialiNamespace(t *testing.T) {
 	assert := assert.New(t)
 
 	// Setup mocks
-	service, prom := setupService([]dashboards.MonitoringDashboard{*fakeDashboard("1")})
+	service, prom := setupService("my-namespace", []dashboards.MonitoringDashboard{*fakeDashboard("1")})
 
 	expectedLabels := "{kubernetes_namespace=\"my-namespace\",APP=\"my-app\"}"
+	namespace := models.Namespace{
+		Name: "my-namespace",
+	}
 	query := models.DashboardQuery{
-		Namespace: "my-namespace",
+		Namespace: namespace.Name,
 		LabelsFilters: map[string]string{
 			"APP": "my-app",
 		},
@@ -93,7 +100,7 @@ func TestGetComposedDashboard(t *testing.T) {
 	composed.Items = append(composed.Items, dashboards.MonitoringDashboardItem{Include: "dashboard1"})
 
 	// Setup mocks
-	service, _ := setupService([]dashboards.MonitoringDashboard{*fakeDashboard("1"), *composed})
+	service, _ := setupService("my-namespace", []dashboards.MonitoringDashboard{*fakeDashboard("1"), *composed})
 
 	d, err := service.loadAndResolveDashboardResource("dashboard2", map[string]bool{})
 	assert.Nil(err)
@@ -112,7 +119,7 @@ func TestGetComposedDashboardSingleChart(t *testing.T) {
 	composed.Items = append(composed.Items, dashboards.MonitoringDashboardItem{Include: "dashboard1$My chart 1_2"})
 
 	// Setup mocks
-	service, _ := setupService([]dashboards.MonitoringDashboard{*fakeDashboard("1"), *composed})
+	service, _ := setupService("my-namespace", []dashboards.MonitoringDashboard{*fakeDashboard("1"), *composed})
 
 	d, err := service.loadAndResolveDashboardResource("dashboard2", map[string]bool{})
 	assert.Nil(err)
@@ -130,7 +137,7 @@ func TestCircularDependency(t *testing.T) {
 	composed.Items = append(composed.Items, dashboards.MonitoringDashboardItem{Include: "dashboard2"})
 
 	// Setup mocks
-	service, _ := setupService([]dashboards.MonitoringDashboard{*fakeDashboard("2"), *composed})
+	service, _ := setupService("my-namespace", []dashboards.MonitoringDashboard{*fakeDashboard("2"), *composed})
 
 	_, err := service.loadAndResolveDashboardResource("dashboard2", map[string]bool{})
 	assert.Contains(err.Error(), "circular dependency detected")
@@ -199,7 +206,7 @@ func TestGetCustomDashboardRefs(t *testing.T) {
 	assert := assert.New(t)
 
 	// Setup mocks
-	service, prom := setupService([]dashboards.MonitoringDashboard{*fakeDashboard("1"), *fakeDashboard("2")})
+	service, prom := setupService("my-namespace", []dashboards.MonitoringDashboard{*fakeDashboard("1"), *fakeDashboard("2")})
 
 	prom.MockMetricsForLabels([]string{"my_metric_1_1", "request_count", "tcp_received", "tcp_sent"})
 	pods := []*models.Pod{}
@@ -254,7 +261,8 @@ func TestBuildIstioDashboard(t *testing.T) {
 	// Setup mocks
 	conf := config.NewConfig()
 	config.Set(conf)
-	service := NewDashboardsService()
+	ns := models.Namespace{Name: "my-namespace"}
+	service := NewDashboardsService(&ns, nil)
 
 	dashboard := service.BuildIstioDashboard(fakeMetrics(), "inbound")
 

@@ -27,12 +27,6 @@ func CustomDashboard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	svc := business.NewDashboardsService()
-	if !svc.CustomEnabled {
-		RespondWithError(w, http.StatusServiceUnavailable, "Custom dashboards are disabled in config")
-		return
-	}
-
 	// Check namespace
 	layer, err := getBusiness(r)
 	if err != nil {
@@ -44,10 +38,30 @@ func CustomDashboard(w http.ResponseWriter, r *http.Request) {
 		RespondWithError(w, http.StatusForbidden, "Cannot access namespace data: "+err.Error())
 		return
 	}
+
 	params := models.DashboardQuery{Namespace: namespace}
 	err = extractDashboardQueryParams(queryParams, &params, info)
 	if err != nil {
 		RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	var wkd *models.Workload
+	if params.Workload != "" {
+		wkd, err = layer.Workload.GetWorkload(namespace, params.Workload, params.WorkloadType, false)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				RespondWithError(w, http.StatusNotFound, err.Error())
+			} else {
+				RespondWithError(w, http.StatusInternalServerError, err.Error())
+			}
+			return
+		}
+	}
+
+	svc := business.NewDashboardsService(info, wkd)
+	if !svc.CustomEnabled {
+		RespondWithError(w, http.StatusServiceUnavailable, "Custom dashboards are disabled in config")
 		return
 	}
 
@@ -82,6 +96,7 @@ func extractDashboardQueryParams(queryParams url.Values, q *models.DashboardQuer
 	if op == "sum" || op == "min" || op == "max" || op == "avg" || op == "stddev" || op == "stdvar" {
 		q.RawDataAggregator = op
 	}
+	q.Workload = queryParams.Get("workload")
 	return extractBaseMetricsQueryParams(queryParams, &q.RangeQuery, namespaceInfo)
 }
 
@@ -121,7 +136,7 @@ func AppDashboard(w http.ResponseWriter, r *http.Request) {
 		RespondWithError(w, http.StatusServiceUnavailable, err.Error())
 		return
 	}
-	dashboard := business.NewDashboardsService().BuildIstioDashboard(metrics, params.Direction)
+	dashboard := business.NewDashboardsService(namespaceInfo, nil).BuildIstioDashboard(metrics, params.Direction)
 	RespondWithJSON(w, http.StatusOK, dashboard)
 }
 
@@ -149,7 +164,7 @@ func ServiceDashboard(w http.ResponseWriter, r *http.Request) {
 		RespondWithError(w, http.StatusServiceUnavailable, err.Error())
 		return
 	}
-	dashboard := business.NewDashboardsService().BuildIstioDashboard(metrics, params.Direction)
+	dashboard := business.NewDashboardsService(namespaceInfo, nil).BuildIstioDashboard(metrics, params.Direction)
 	RespondWithJSON(w, http.StatusOK, dashboard)
 }
 
@@ -177,6 +192,6 @@ func WorkloadDashboard(w http.ResponseWriter, r *http.Request) {
 		RespondWithError(w, http.StatusServiceUnavailable, err.Error())
 		return
 	}
-	dashboard := business.NewDashboardsService().BuildIstioDashboard(metrics, params.Direction)
+	dashboard := business.NewDashboardsService(namespaceInfo, nil).BuildIstioDashboard(metrics, params.Direction)
 	RespondWithJSON(w, http.StatusOK, dashboard)
 }
