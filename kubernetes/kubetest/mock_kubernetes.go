@@ -8,7 +8,13 @@ import (
 	core_v1 "k8s.io/api/core/v1"
 
 	"github.com/kiali/kiali/kubernetes"
+	"github.com/kiali/kiali/util/httputil"
 )
+
+func (o *K8SClientMock) ForwardGetRequest(namespace, podName string, localPort, destinationPort int, path string) ([]byte, error) {
+	args := o.Called(namespace, podName, localPort, destinationPort, path)
+	return args.Get(0).([]byte), args.Error(1)
+}
 
 func (o *K8SClientMock) GetClusterServicesByLabels(labelsSelector string) ([]core_v1.Service, error) {
 	args := o.Called(labelsSelector)
@@ -85,9 +91,9 @@ func (o *K8SClientMock) GetPodLogs(namespace, name string, opts *core_v1.PodLogO
 	return args.Get(0).(*kubernetes.PodLogs), args.Error(1)
 }
 
-func (o *K8SClientMock) GetPodProxy(namespace, name, path string) ([]byte, error) {
-	args := o.Called(namespace, name, path)
-	return args.Get(0).([]byte), args.Error(1)
+func (o *K8SClientMock) GetPodPortForwarder(namespace, name, portMap string) (*httputil.PortForwarder, error) {
+	args := o.Called(namespace, name, portMap)
+	return args.Get(0).(*httputil.PortForwarder), args.Error(1)
 }
 
 func (o *K8SClientMock) GetReplicationControllers(namespace string) ([]core_v1.ReplicationController, error) {

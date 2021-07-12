@@ -4,6 +4,7 @@ import (
 	"bytes"
 	goerrors "errors"
 	"fmt"
+	"time"
 
 	osapps_v1 "github.com/openshift/api/apps/v1"
 	osproject_v1 "github.com/openshift/api/project/v1"
@@ -23,10 +24,12 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd/api"
 
+	"github.com/kiali/kiali/log"
 	"github.com/kiali/kiali/util/httputil"
 )
 
 type K8SClientInterface interface {
+	ForwardGetRequest(namespace, podName string, localPort, destinationPort int, path string) ([]byte, error)
 	GetClusterServicesByLabels(labelsSelector string) ([]core_v1.Service, error)
 	GetConfigMap(namespace, name string) (*core_v1.ConfigMap, error)
 	GetCronJobs(namespace string) ([]batch_v1beta1.CronJob, error)
@@ -42,8 +45,8 @@ type K8SClientInterface interface {
 	GetNamespaces(labelSelector string) ([]core_v1.Namespace, error)
 	GetPod(namespace, name string) (*core_v1.Pod, error)
 	GetPodLogs(namespace, name string, opts *core_v1.PodLogOptions) (*PodLogs, error)
-	GetPodProxy(namespace, name, path string) ([]byte, error)
 	GetPods(namespace, labelSelector string) ([]core_v1.Pod, error)
+	GetPodPortForwarder(namespace, podName, portMap string) (*httputil.PortForwarder, error)
 	GetReplicationControllers(namespace string) ([]core_v1.ReplicationController, error)
 	GetReplicaSets(namespace string) ([]apps_v1.ReplicaSet, error)
 	GetSecrets(namespace string, labelSelector string) ([]core_v1.Secret, error)
@@ -64,6 +67,29 @@ type OSClientInterface interface {
 	GetProjects(labelSelector string) ([]osproject_v1.Project, error)
 	GetRoute(namespace string, name string) (*osroutes_v1.Route, error)
 	UpdateProject(project string, jsonPatch string) (*osproject_v1.Project, error)
+}
+
+func (in *K8SClient) ForwardGetRequest(namespace, podName string, localPort, destinationPort int, path string) ([]byte, error) {
+	f, err := in.GetPodPortForwarder(namespace, podName, fmt.Sprintf("%d:%d", localPort, destinationPort))
+	if err != nil {
+		return nil, err
+	}
+
+	// Start the forwarding
+	if err := (*f).Start(); err != nil {
+		return nil, err
+	}
+
+	// Defering the finish of the port-forwarding
+	defer (*f).Stop()
+
+	// Ready to create a request
+	resp, code, err := httputil.HttpGet(fmt.Sprintf("http://localhost:%d%s", localPort, path), nil, 10*time.Second)
+	if code >= 400 {
+		return resp, fmt.Errorf("error fetching %s from %s/%s. Response code: %d", path, namespace, podName, code)
+	}
+
+	return resp, err
 }
 
 // GetClusterServicesByLabels fetches and returns all services in the whole cluster
@@ -326,6 +352,39 @@ func (in *K8SClient) GetPods(namespace, labelSelector string) ([]core_v1.Pod, er
 	}
 }
 
+// GetPodPortForwarder returns a port-forwarder struct which represents an open server forwarding request to the
+// requested pod and port
+// namespace: name of the namespace where the pod lives in.
+// name: name of the pod living in the namespace
+// portMap: ports open by the forwarder. Local port and destination port. Format: "80:8080" (local:destination)
+// It returns both a portforwarder and an error (if present)
+func (in *K8SClient) GetPodPortForwarder(namespace, name, portMap string) (*httputil.PortForwarder, error) {
+	writer := new(bytes.Buffer)
+
+	clientConfig, err := ConfigClient()
+	if err != nil {
+		log.Errorf("Error getting Kubernetes Client config: %v", err)
+		return nil, err
+	}
+
+	// First try whether the pod exist or not
+	pod, err := in.GetPod(namespace, name)
+	if err != nil {
+		log.Errorf("Couldn't fetch the Pod: %v", err)
+		return nil, err
+	}
+
+	// Prevent the forward if the pod is not running
+	if pod.Status.Phase != core_v1.PodRunning {
+		return nil, fmt.Errorf("error creating a pod forwarder for a non-running pod: %s/%s", namespace, name)
+	}
+
+	// Create a Port Forwarder
+	restInterface := in.k8s.CoreV1().RESTClient()
+	return httputil.NewPortForwarder(&restInterface, clientConfig,
+		namespace, name, "localhost", portMap, writer)
+}
+
 // GetPod returns the pod definitions for a given pod name.
 // It returns an error on any problem.
 func (in *K8SClient) GetPod(namespace, name string) (*core_v1.Pod, error) {
@@ -354,17 +413,6 @@ func (in *K8SClient) GetPodLogs(namespace, name string, opts *core_v1.PodLogOpti
 	}
 
 	return &PodLogs{Logs: buf.String()}, nil
-}
-
-func (in *K8SClient) GetPodProxy(namespace, name, path string) ([]byte, error) {
-	return in.k8s.CoreV1().RESTClient().Get().
-		Timeout(httputil.DefaultTimeout).
-		Namespace(namespace).
-		Resource("pods").
-		SubResource("proxy").
-		Name(name).
-		Suffix(path).
-		DoRaw(in.ctx)
 }
 
 func (in *K8SClient) GetCronJobs(namespace string) ([]batch_v1beta1.CronJob, error) {
